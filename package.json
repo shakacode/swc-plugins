@@ -2,20 +2,26 @@
   "name": "swc-plugins-workspace",
   "private": true,
   "scripts": {
-    "lint": "oxlint -c .oxlintrc.jsonc --deny-warnings .",
+    "build": "cargo build --locked --release --target wasm32-wasip1 && node scripts/copy-wasm.mjs",
+    "test": "cargo test --locked --workspace && pnpm test:js",
+    "test:js": "pnpm -r test",
+    "lint": "oxlint -c .oxlintrc.jsonc --deny-warnings . && cargo clippy --locked --workspace --all-targets -- -D warnings",
     "format": "oxfmt -c .oxfmtrc.jsonc . && cargo fmt --all",
-    "format:check": "oxfmt -c .oxfmtrc.jsonc --check . && cargo fmt --all --check"
+    "format:check": "oxfmt -c .oxfmtrc.jsonc --check . && cargo fmt --all --check",
+    "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
     "@jridgewell/trace-mapping": "0.3.31",
     "@swc/core": "1.16.21",
+    "@types/node": "24.19.2",
     "oxfmt": "0.75.0",
     "oxlint": "1.90.0",
     "rspack-earliest": "npm:@rspack/core@2.2.0",
-    "rspack-latest": "npm:@rspack/core@^2.2.0"
+    "rspack-latest": "npm:@rspack/core@^2.2.0",
+    "typescript": "7.0.2"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "packageManager": "pnpm@8.14.1"
 }

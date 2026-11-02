@@ -11,4 +11,4 @@
 /packages/*/*.wasm
 /test-output/
 *.tgz
-/.swc/
+.swc/

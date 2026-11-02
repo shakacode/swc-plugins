@@ -1,0 +1,23 @@
+{
+  "name": "swc-plugin-transform-invariant-warning",
+  "version": "0.1.0",
+  "description": "Binding-aware production transforms for invariant and warning calls",
+  "keywords": [
+    "invariant",
+    "rspack",
+    "swc-plugin",
+    "warning"
+  ],
+  "license": "MIT",
+  "files": [
+    "plugin.wasm",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "main": "plugin.wasm",
+  "scripts": {
+    "test": "node --test --test-isolation=none tests/*.test.mts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}
