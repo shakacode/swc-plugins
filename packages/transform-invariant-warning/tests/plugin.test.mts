@@ -1,24 +1,27 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { transformSync, type Options } from '@swc/core';
 
+import type { PluginOptions } from 'swc-plugin-transform-invariant-warning';
+
 const plugin = fileURLToPath(new URL('../plugin.wasm', import.meta.url));
 
-export function compile(source: string, options: unknown = {}) {
+export function compile(source: string, options: PluginOptions = {}) {
   return transformSync(source, {
     filename: 'fixture.ts',
     jsc: {
       parser: { syntax: 'typescript' },
       target: 'es2022',
-      experimental: { plugins: [[plugin, options as Record<string, unknown>]] },
+      experimental: { plugins: [[plugin, options]] },
     },
     module: { type: 'commonjs' },
   }).code;
 }
 
-function evaluate(source: string, options: unknown = {}) {
+function evaluate(source: string, options: PluginOptions = {}) {
   const calls: unknown[][] = [];
   const fn = (...args: unknown[]) => calls.push(args);
   const exported = { calls };
@@ -33,6 +36,11 @@ function evaluate(source: string, options: unknown = {}) {
   vm.runInNewContext(compile(source, options), context);
   return JSON.parse(JSON.stringify(context.module.exports)) as { calls: unknown[][] };
 }
+
+test('the package runtime entry still resolves to the Wasm artifact', () => {
+  const require = createRequire(import.meta.url);
+  assert.equal(require.resolve('swc-plugin-transform-invariant-warning'), plugin);
+});
 
 test('warning arguments are never evaluated', () => {
   assert.deepEqual(
@@ -253,10 +261,12 @@ for (const options of [
   { transformGlobals: 'yes' },
   { warningSources: 'warning' },
   { invariantSources: [42] },
+  { warningSources: null },
+  { transformGlobals: null },
   null,
 ]) {
   test(`rejects invalid options ${JSON.stringify(options)}`, () => {
-    assert.throws(() => compile('warning(false);', options));
+    assert.throws(() => compile('warning(false);', options as unknown as PluginOptions));
   });
 }
 
@@ -285,3 +295,20 @@ for (const [name, source] of [
     assert.deepEqual(JSON.parse(transformed.map!), JSON.parse(baseline.map!));
   });
 }
+
+// These also exercise the published declaration through TypeScript's package resolution.
+const typedOptions: PluginOptions = {
+  warningSources: ['warning'],
+  invariantSources: ['invariant'],
+  transformGlobals: false,
+};
+void typedOptions;
+// @ts-expect-error Source lists contain strings only.
+const invalidSources: PluginOptions = { warningSources: [42] };
+void invalidSources;
+// @ts-expect-error Global rewriting takes a boolean.
+const invalidGlobals: PluginOptions = { transformGlobals: 'yes' };
+void invalidGlobals;
+// @ts-expect-error Unknown options are rejected.
+const invalidOption: PluginOptions = { unknown: true };
+void invalidOption;

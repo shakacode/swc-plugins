@@ -113,6 +113,14 @@ reassignments are conservatively left unchanged throughout the file.
 
 ## Options
 
+TypeScript consumers can import the generated options type:
+
+```ts
+import type { PluginOptions } from 'swc-plugin-transform-invariant-warning';
+
+const options = { transformGlobals: false } satisfies PluginOptions;
+```
+
 ```json
 {
   "warningSources": [

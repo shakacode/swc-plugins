@@ -8,6 +8,7 @@
     "lint": "oxlint -c .oxlintrc.jsonc --deny-warnings . && cargo clippy --locked --workspace --all-targets -- -D warnings",
     "format": "oxfmt -c .oxfmtrc.jsonc . && cargo fmt --all",
     "format:check": "oxfmt -c .oxfmtrc.jsonc --check . && cargo fmt --all --check",
+    "types:generate": "UPDATE_BINDINGS=1 cargo test --locked --lib exported_options_are_current",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {

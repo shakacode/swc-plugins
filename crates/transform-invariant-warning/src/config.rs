@@ -6,13 +6,25 @@ pub enum Kind {
     Invariant,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct PluginOptions {
+    #[cfg_attr(test, ts(as = "Option<_>", optional))]
+    warning_sources: Vec<String>,
+    #[cfg_attr(test, ts(as = "Option<_>", optional))]
+    invariant_sources: Vec<String>,
+    #[cfg_attr(test, ts(as = "Option<_>", optional))]
+    transform_globals: bool,
+}
+
 pub struct Config {
     warning_sources: HashSet<String>,
     invariant_sources: HashSet<String>,
     pub transform_globals: bool,
 }
 
-impl Default for Config {
+impl Default for PluginOptions {
     fn default() -> Self {
         Self {
             warning_sources: [
@@ -42,30 +54,15 @@ impl Default for Config {
 
 impl Config {
     pub fn parse(json: &str) -> Result<Self, String> {
-        let value: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
-        let options = value
-            .as_object()
-            .ok_or("plugin options must be an object")?;
-        let mut config = Self::default();
-        for (key, value) in options {
-            match key.as_str() {
-                "warningSources" => {
-                    config.warning_sources = serde_json::from_value(value.clone())
-                        .map_err(|e| format!("warningSources: {e}"))?
-                }
-                "invariantSources" => {
-                    config.invariant_sources = serde_json::from_value(value.clone())
-                        .map_err(|e| format!("invariantSources: {e}"))?
-                }
-                "transformGlobals" => {
-                    config.transform_globals = value
-                        .as_bool()
-                        .ok_or("transformGlobals must be a boolean")?
-                }
-                _ => return Err(format!("unknown plugin option: {key}")),
-            }
-        }
-        Ok(config)
+        let mut deserializer = serde_json::Deserializer::from_str(json);
+        let options: PluginOptions = serde_path_to_error::deserialize(&mut deserializer)
+            .map_err(|error| error.to_string())?;
+        deserializer.end().map_err(|error| error.to_string())?;
+        Ok(Self {
+            warning_sources: options.warning_sources.into_iter().collect(),
+            invariant_sources: options.invariant_sources.into_iter().collect(),
+            transform_globals: options.transform_globals,
+        })
     }
 
     pub fn kind(&self, source: &str, export: &str) -> Option<Kind> {
@@ -79,4 +76,47 @@ impl Config {
             _ => None,
         }
     }
+}
+
+#[cfg(test)]
+#[test]
+fn exported_options_are_current() {
+    use ts_rs::TS;
+    let declaration = format!(
+        "// Generated from Rust by ts-rs. Run pnpm types:generate to update.\nexport {}\n",
+        PluginOptions::decl(&ts_rs::Config::default()),
+    );
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../packages/transform-invariant-warning/index.d.ts");
+    // Use the same formatter as the rest of the repository before comparing output.
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let mut formatter = Command::new("pnpm")
+        .current_dir(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .args(["exec", "oxfmt", "-c", ".oxfmtrc.jsonc", "--stdin-filepath"])
+        .arg(&path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("pnpm and Oxfmt must be installed to check generated declarations");
+    formatter
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(declaration.as_bytes())
+        .unwrap();
+    let output = formatter.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "Oxfmt failed to format the declaration"
+    );
+    let declaration = String::from_utf8(output.stdout).unwrap();
+    if std::env::var_os("UPDATE_BINDINGS").is_some() {
+        std::fs::write(&path, &declaration).unwrap();
+    }
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap_or_default(),
+        declaration,
+        "Run pnpm types:generate and commit the generated declaration"
+    );
 }

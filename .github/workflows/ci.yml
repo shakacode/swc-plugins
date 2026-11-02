@@ -27,6 +27,8 @@ jobs:
       - name: Resolve the newest supported Rspack release
         run: pnpm update rspack-latest
       - run: pnpm format:check
+      - name: Check generated TypeScript declarations
+        run: cargo test --locked --lib exported_options_are_current
       - run: pnpm typecheck
       - run: pnpm lint
       - name: Build the shared Wasm artifact

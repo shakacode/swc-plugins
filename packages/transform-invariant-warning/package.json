@@ -13,9 +13,17 @@
     "plugin.wasm",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "index.d.ts"
   ],
   "main": "plugin.wasm",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./plugin.wasm"
+    }
+  },
   "scripts": {
     "test": "node --test --test-isolation=none tests/*.test.mts",
     "typecheck": "tsc --noEmit -p tsconfig.json"

@@ -38,3 +38,8 @@ plugin, use its directory name as the scope, for example
 `transform-invariant-warning: preserve shadowed bindings`. Use `all` for changes
 across plugins or the repository, or `rust` and `js` for shared language-specific
 tooling. Write changelog entries for users separately from commit messages.
+
+Plugin option declarations are generated from Rust with `ts-rs`. After changing
+the options struct, run `pnpm types:generate` and commit the generated declaration.
+Rust tests and CI verify that the declaration is up to date; edit the Rust source
+instead of editing the generated file directly.
