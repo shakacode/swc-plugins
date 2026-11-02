@@ -82,3 +82,35 @@ fn type_only_import_is_preserved() {
     assert!(code.contains("import type warning"), "{code}");
     assert!(code.contains("type Warning = typeof warning"), "{code}");
 }
+
+#[test]
+fn wrapped_assignment_targets_invalidate_bindings() {
+    for target in [
+        "(check)",
+        "(check as any)",
+        "(check satisfies any)",
+        "check!",
+        "(<any>check)",
+    ] {
+        let source = format!(
+            "let check = require('invariant'); {target} = runtime; check(true, message());"
+        );
+        let code = rewrite(&source, "{}").unwrap();
+        assert!(code.contains("message()"), "{target}: {code}");
+    }
+}
+
+#[test]
+fn member_assignment_targets_still_visit_nested_writes() {
+    for (target, retains_message) in [("check.property", false), ("holder[check = runtime]", true)]
+    {
+        let source =
+            format!("let check = require('invariant'); {target} = value; check(true, message());");
+        let code = rewrite(&source, "{}").unwrap();
+        assert_eq!(
+            code.contains("message()"),
+            retains_message,
+            "{target}: {code}"
+        );
+    }
+}

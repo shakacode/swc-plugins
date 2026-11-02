@@ -64,26 +64,30 @@ impl<'a> Bindings<'a> {
             Pat::Ident(ident) => {
                 self.writes.insert(ident.to_id());
             }
-            Pat::Array(array) => {
-                for element in array.elems.iter().flatten() {
-                    self.write_pattern(element);
-                }
-            }
-            Pat::Object(object) => {
-                for prop in &object.props {
-                    match prop {
-                        ObjectPatProp::KeyValue(prop) => self.write_pattern(&prop.value),
-                        ObjectPatProp::Assign(prop) => {
-                            self.writes.insert(prop.key.to_id());
-                        }
-                        ObjectPatProp::Rest(prop) => self.write_pattern(&prop.arg),
-                    }
-                }
-            }
+            Pat::Array(array) => self.write_array_pattern(array),
+            Pat::Object(object) => self.write_object_pattern(object),
             Pat::Assign(assign) => self.write_pattern(&assign.left),
             Pat::Rest(rest) => self.write_pattern(&rest.arg),
             Pat::Expr(expr) => self.write_expr(expr),
             _ => {}
+        }
+    }
+
+    fn write_array_pattern(&mut self, array: &ArrayPat) {
+        for element in array.elems.iter().flatten() {
+            self.write_pattern(element);
+        }
+    }
+
+    fn write_object_pattern(&mut self, object: &ObjectPat) {
+        for prop in &object.props {
+            match prop {
+                ObjectPatProp::KeyValue(prop) => self.write_pattern(&prop.value),
+                ObjectPatProp::Assign(prop) => {
+                    self.writes.insert(prop.key.to_id());
+                }
+                ObjectPatProp::Rest(prop) => self.write_pattern(&prop.arg),
+            }
         }
     }
 
@@ -185,14 +189,23 @@ impl Visit for Bindings<'_> {
 
     fn visit_assign_expr(&mut self, assignment: &AssignExpr) {
         match &assignment.left {
-            AssignTarget::Simple(SimpleAssignTarget::Ident(ident)) => {
-                self.writes.insert(ident.to_id());
-            }
-            AssignTarget::Simple(target) => {
-                let expr: Box<Expr> = target.clone().into();
-                self.write_expr(&expr);
-            }
-            AssignTarget::Pat(pattern) => self.write_pattern(&pattern.clone().into()),
+            AssignTarget::Simple(target) => match target {
+                SimpleAssignTarget::Ident(ident) => {
+                    self.writes.insert(ident.to_id());
+                }
+                SimpleAssignTarget::Paren(expr) => self.write_expr(&expr.expr),
+                SimpleAssignTarget::TsAs(expr) => self.write_expr(&expr.expr),
+                SimpleAssignTarget::TsSatisfies(expr) => self.write_expr(&expr.expr),
+                SimpleAssignTarget::TsNonNull(expr) => self.write_expr(&expr.expr),
+                SimpleAssignTarget::TsTypeAssertion(expr) => self.write_expr(&expr.expr),
+                SimpleAssignTarget::TsInstantiation(expr) => self.write_expr(&expr.expr),
+                _ => {}
+            },
+            AssignTarget::Pat(pattern) => match pattern {
+                AssignTargetPat::Array(array) => self.write_array_pattern(array),
+                AssignTargetPat::Object(object) => self.write_object_pattern(object),
+                AssignTargetPat::Invalid(_) => {}
+            },
         }
         assignment.visit_children_with(self);
     }
