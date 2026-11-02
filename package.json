@@ -1,0 +1,21 @@
+{
+  "name": "swc-plugins-workspace",
+  "private": true,
+  "scripts": {
+    "lint": "oxlint -c .oxlintrc.jsonc --deny-warnings .",
+    "format": "oxfmt -c .oxfmtrc.jsonc . && cargo fmt --all",
+    "format:check": "oxfmt -c .oxfmtrc.jsonc --check . && cargo fmt --all --check"
+  },
+  "devDependencies": {
+    "@jridgewell/trace-mapping": "0.3.31",
+    "@swc/core": "1.16.21",
+    "oxfmt": "0.75.0",
+    "oxlint": "1.90.0",
+    "rspack-earliest": "npm:@rspack/core@2.2.0",
+    "rspack-latest": "npm:@rspack/core@^2.2.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@8.14.1"
+}

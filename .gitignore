@@ -1,0 +1,14 @@
+/docs/superpowers/specs/
+/docs/superpowers/plans/
+/.superpowers/
+/.idea/
+/.agents/
+/.codex/
+/.aws/
+/node_modules/
+**/node_modules/
+/target/
+/packages/*/*.wasm
+/test-output/
+*.tgz
+/.swc/
