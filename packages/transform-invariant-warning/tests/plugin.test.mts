@@ -247,6 +247,25 @@ test('preserves optional invariant short-circuiting', () => {
   vm.runInNewContext(code, { invariant: undefined });
 });
 
+test('preserves optional invariant arguments and their evaluation order when defined', () => {
+  assert.deepEqual(
+    evaluate(`
+      const events = [];
+      function argument(name, value) { events.push(name); return value; }
+      invariant?.(argument('condition', false), argument('message', 'retained'));
+      invariant?.(argument('condition', true), argument('message', 'also retained'));
+      exports.events = events;
+    `),
+    {
+      calls: [
+        [false, 'retained'],
+        [true, 'also retained'],
+      ],
+      events: ['condition', 'message', 'condition', 'message'],
+    },
+  );
+});
+
 test('preserves reassigned require bindings conservatively', () => {
   assert.deepEqual(
     evaluate(
@@ -255,6 +274,47 @@ test('preserves reassigned require bindings conservatively', () => {
     [['runtime']],
   );
 });
+
+for (const kind of ['warning', 'invariant']) {
+  for (const [name, assignment] of [
+    ['array destructuring', '[helper] = [runtime];'],
+    ['nested destructuring with a default', '[{ value: helper = runtime }] = [{}];'],
+    ['array rest destructuring', '[...[helper]] = [runtime];'],
+    ['object shorthand with a default', '({ helper = runtime } = {});'],
+    ['for-of target', 'for (helper of [runtime]) {}'],
+    ['for-of var target', 'for (var helper of [runtime]) {}'],
+    ['repeated var initialization', 'var helper = runtime;'],
+  ]) {
+    test(`preserves ${kind} calls around ${name}`, () => {
+      assert.deepEqual(
+        evaluate(`
+          var helper = require('${kind}');
+          const runtime = (...args) => exports.calls.push(args);
+          helper(true, 'before');
+          ${assignment}
+          helper(true, 'after');
+        `).calls,
+        [
+          [true, 'before'],
+          [true, 'after'],
+        ],
+      );
+    });
+  }
+
+  for (const [name, assignment] of [
+    ['update', 'helper++;'],
+    ['object rest destructuring', '({ ...helper } = { retained: true });'],
+    ['for-in target', 'for (helper in { key: true }) {}'],
+  ]) {
+    test(`preserves the ${kind} call failure after ${name}`, () => {
+      assert.throws(
+        () => evaluate(`var helper = require('${kind}'); ${assignment} helper(true, 'retained');`),
+        /helper is not a function/,
+      );
+    });
+  }
+}
 
 for (const options of [
   { unknown: true },
