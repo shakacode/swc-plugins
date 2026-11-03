@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { execCommitlint } from './commitlint.mts';
 
 for (const subject of [
   'tooling: check commit subjects',
@@ -17,8 +18,7 @@ for (const subject of [
   'transform-invariant-warning: preserve bindings',
 ]) {
   test(`accepts ${subject}`, () => {
-    const result = spawnSync('pnpm', ['exec', 'commitlint'], { input: subject, encoding: 'utf8' });
-    assert.ifError(result.error);
+    const result = execCommitlint([], { input: subject });
     assert.equal(result.status, 0, result.stdout + result.stderr);
   });
 }
@@ -35,8 +35,7 @@ for (const subject of [
   'Merge pull request #1',
 ]) {
   test(`rejects ${JSON.stringify(subject)}`, () => {
-    const result = spawnSync('pnpm', ['exec', 'commitlint'], { input: subject, encoding: 'utf8' });
-    assert.ifError(result.error);
+    const result = execCommitlint([], { input: subject });
     assert.equal(result.status, 1, result.stdout + result.stderr);
     assert.match(result.stdout + result.stderr, /scope|subject|header/i);
   });
