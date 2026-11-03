@@ -68,7 +68,7 @@ Keep the changelog preparation separate from unrelated working-tree changes.
 For a requested PR, work on a branch from the current remote target, using an
 isolated worktree when needed. Commit and push only when authorized by the
 request; a request to open the changelog PR authorizes its branch push. Follow
-Scoped Commits for the commit subject and PR title, and include a description
+CONTRIBUTING.md for PR titles and commit guidance, and include a description
 with the selected plugin/version, review range, validation, and any evidence gaps.
 For a local-only request, leave a reviewable diff and report its location.
 
