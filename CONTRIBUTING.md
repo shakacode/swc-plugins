@@ -14,7 +14,9 @@ pnpm format:check
 ```
 
 `pnpm build` compiles the Wasm plugin and copies it into its npm package.
-Build before running JavaScript tests.
+Build before running JavaScript tests. `pnpm run setup` combines dependency
+installation and the Wasm build; `pnpm run validate` runs formatting, type checking,
+linting, the build, and tests.
 
 The integration suite uses the same
 artifact with standalone SWC and the earliest and latest supported Rspack releases
@@ -82,15 +84,3 @@ Choose boundaries that make each PR coherent, understandable, and verifiable.
 Keep each layer's description focused on its own changes and explain its
 relationship to the rest of the stack. Run the applicable checks for each layer
 and update dependent branches when an earlier layer changes.
-
-## Shaka workflow
-
-See [.agents/shaka.md](.agents/shaka.md) for the repository configuration. Run
-`.agents/shaka/bin/setup` to install dependencies and build the Wasm artifact,
-`.agents/shaka/bin/test` to run tests, and `.agents/shaka/bin/validate` for the full
-validation suite. The wrappers delegate to the root package scripts.
-
-Merge policy is Ask. Shaka requires the GitHub check named `check` before declaring
-a PR ready; on the current private-repository plan GitHub does not enforce branch
-protection, so the maintainer must inspect that result before merging. No hosted
-AI-review job is configured; meaningful implementation still gets local review.
