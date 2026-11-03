@@ -9,7 +9,7 @@
     "format": "oxfmt -c .oxfmtrc.jsonc . && cargo fmt --all",
     "format:check": "oxfmt -c .oxfmtrc.jsonc --check . && cargo fmt --all --check",
     "types:generate": "UPDATE_BINDINGS=1 cargo test --locked --lib exported_options_are_current",
-    "typecheck": "tsc --noEmit -p tsconfig.tooling.json && pnpm -r typecheck",
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck",
     "commitlint": "commitlint",
     "commitlint:ci": "node scripts/commitlint-ci.mts",
     "test:commitlint": "node --test --test-isolation=none scripts/commitlint.test.mts"
@@ -21,6 +21,7 @@
     "@types/node": "24.19.2",
     "oxfmt": "0.75.0",
     "oxlint": "1.90.0",
+    "oxlint-tsgolint": "7.0.2005",
     "rspack-earliest": "npm:@rspack/core@2.2.0",
     "rspack-latest": "npm:@rspack/core@^2.2.0",
     "typescript": "7.0.2"

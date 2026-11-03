@@ -1,7 +1,16 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "options": {
+    "typeAware": true,
+  },
   "rules": {
     "curly": ["error", "all"],
+    "typescript/no-floating-promises": [
+      "error",
+      {
+        "allowForKnownSafeCalls": [{ "from": "package", "name": "test", "package": "node:test" }],
+      },
+    ],
   },
   "ignorePatterns": ["docs/superpowers/"],
 }
