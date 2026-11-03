@@ -7,6 +7,7 @@ merge:
   preference: ask
   required_checks:
     - check
+    - commitlint
 branches:
   name: '{login}-{host}/{issue}-{description}'
 wip:

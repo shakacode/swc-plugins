@@ -34,9 +34,9 @@ leaves this file alone; it never overwrites one you have edited.
 
 ## Repository choices
 
-Merge policy is Ask. The fallback required CI check is `check`, verified from
+Merge policy is Ask. The fallback required CI checks are `check` and `commitlint`, verified from
 GitHub's job reports. The current private-repository plan does not enforce branch
-protection, so Shaka checks that result and the maintainer inspects it before
+protection, so Shaka checks those results and the maintainer inspects them before
 merging. No hosted AI-review job is configured; meaningful implementation still
 gets local review through the Shaka workflow.
 
