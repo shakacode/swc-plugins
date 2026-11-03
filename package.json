@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "build": "cargo build --locked --release --target wasm32-wasip1 && node scripts/copy-wasm.mjs",
-    "test": "cargo test --locked --workspace && pnpm test:js",
+    "test": "cargo test --locked --workspace && pnpm test:js && pnpm test:commitlint",
     "test:js": "pnpm -r test",
     "lint": "oxlint -c .oxlintrc.jsonc --deny-warnings . && cargo clippy --locked --workspace --all-targets -- -D warnings",
     "format": "oxfmt -c .oxfmtrc.jsonc . && cargo fmt --all",
