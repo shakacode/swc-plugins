@@ -3,15 +3,19 @@
   "private": true,
   "scripts": {
     "build": "cargo build --locked --release --target wasm32-wasip1 && node scripts/copy-wasm.mjs",
-    "test": "cargo test --locked --workspace && pnpm test:js",
+    "test": "cargo test --locked --workspace && pnpm test:js && pnpm test:commitlint",
     "test:js": "pnpm -r test",
     "lint": "oxlint -c .oxlintrc.jsonc --deny-warnings . && cargo clippy --locked --workspace --all-targets -- -D warnings",
     "format": "oxfmt -c .oxfmtrc.jsonc . && cargo fmt --all",
     "format:check": "oxfmt -c .oxfmtrc.jsonc --check . && cargo fmt --all --check",
     "types:generate": "UPDATE_BINDINGS=1 cargo test --locked --lib exported_options_are_current",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "tsc --noEmit -p tsconfig.tooling.json && pnpm -r typecheck",
+    "commitlint": "commitlint",
+    "commitlint:ci": "node scripts/commitlint-ci.mts",
+    "test:commitlint": "node --test --test-isolation=none scripts/commitlint.test.mts"
   },
   "devDependencies": {
+    "@commitlint/cli": "21.2.4",
     "@jridgewell/trace-mapping": "0.3.31",
     "@swc/core": "1.16.21",
     "@types/node": "24.19.2",
