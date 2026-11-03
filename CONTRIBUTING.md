@@ -25,10 +25,15 @@ locally; `rspack-earliest` stays pinned to 2.2.0.
 Run `pnpm format` to format supported files with Oxfmt and Rust with rustfmt.
 Run `pnpm lint` to lint JavaScript and TypeScript with Oxlint and Rust with Clippy.
 
-Each package's changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Each package's changelog follows [Keep a Changelog 2.0.0](https://keepachangelog.com/en/2.0.0/).
 Record user-visible changes under `Unreleased` in the affected package's
 `CHANGELOG.md`. Use Added, Changed, Deprecated, Removed, Fixed, or Security
 subsections only when needed. Describe user impact and omit internal-only changes.
+Start each changelog with a short preamble linking to that convention and
+Semantic Versioning. Mark breaking entries with `**Breaking:**` under their
+normal change type, explaining what breaks and linking to substantial upgrade
+instructions. Version comparison links use the affected package's
+`<npm-package-name>@<version>` tags, since plugins are versioned independently.
 At release time, move entries to a versioned section dated `YYYY-MM-DD` and keep
 an empty `Unreleased` section at the top.
 
