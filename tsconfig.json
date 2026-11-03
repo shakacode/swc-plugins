@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["scripts/*.mts", "commitlint.config.mts"]
+  "include": ["scripts/**/*.mts", "commitlint.config.mts"]
 }
