@@ -70,11 +70,15 @@ for (const [endpoint, host] of [
     await new Promise<void>((resolve, reject) => {
       compiler.run((error, stats) => {
         compiler.close((closeError) => {
-          if (error || closeError) reject(error || closeError);
-          else if (!stats) reject(new Error('Rspack did not return build statistics'));
-          else if (stats.hasErrors())
+          if (error || closeError) {
+            reject(error || closeError);
+          } else if (!stats) {
+            reject(new Error('Rspack did not return build statistics'));
+          } else if (stats.hasErrors()) {
             reject(new Error(stats.toString({ all: false, errors: true })));
-          else resolve();
+          } else {
+            resolve();
+          }
         });
       });
     });
