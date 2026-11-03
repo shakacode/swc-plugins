@@ -40,6 +40,11 @@ protection, so Shaka checks those results and the maintainer inspects them befor
 merging. No hosted AI-review job is configured; meaningful implementation still
 gets local review through the Shaka workflow.
 
+Before reporting a PR ready, compare its title's scope with the actual diff using
+the scope guidance in CONTRIBUTING.md. Recommend a corrected title when the scope
+does not fit, even if commitlint accepts it. Leave renaming a user-chosen title to
+the maintainer unless a change is requested.
+
 The setup wrapper delegates to `pnpm run setup` (frozen install and Wasm build),
 test to `pnpm run test`, and validate to `pnpm run validate` (formatting, types,
 lint, build, and tests).
