@@ -33,11 +33,20 @@ At release time, move entries to a versioned section dated `YYYY-MM-DD` and keep
 an empty `Unreleased` section at the top.
 
 Commit messages follow [Scoped Commits](https://scopedcommits.com/), with the
-first line formatted as `<scope>: <description>`. For a change limited to one
-plugin, use its directory name as the scope, for example
-`transform-invariant-warning: preserve shadowed bindings`. Use `all` for changes
-across plugins or the repository, or `rust` and `js` for shared language-specific
-tooling. Write changelog entries for users separately from commit messages.
+first line formatted as `<scope>: <description>`. Choose a scope based on the
+area changed:
+
+- `<plugin-directory>:` — changes limited to one plugin, including its tests and
+  documentation; for example, `transform-invariant-warning: preserve shadowed bindings`.
+- `tooling:` — shared build scripts, CI, linting, formatting, and workflow configuration.
+- `docs:` — repository-wide documentation and contributor guidance.
+- `deps:` — shared dependency updates; plugin-specific dependencies use the plugin’s scope.
+- `release:` — versioning, packaging, and publishing changes.
+- `rust:` — shared Rust code across plugins.
+- `js:` — shared JavaScript or TypeScript code across plugins.
+- `all:` — changes spanning multiple plugins or areas without a more specific scope.
+
+Write changelog entries for users separately from commit messages.
 
 Plugin option declarations are generated from Rust with `ts-rs`. After changing
 the options struct, run `pnpm types:generate` and commit the generated declaration.
