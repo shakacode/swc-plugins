@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { execCommitlint } from './commitlint.mts';
+import { execCommitlint } from './lib/commitlint.mts';
 
 for (const title of [
   'tooling: check PR titles',

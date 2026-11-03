@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { execCommitlint } from './commitlint.mts';
+import { execCommitlint } from './lib/commitlint.mts';
 
 if (process.env.GITHUB_EVENT_NAME !== 'pull_request') {
   throw new Error('Only pull_request events are supported');
