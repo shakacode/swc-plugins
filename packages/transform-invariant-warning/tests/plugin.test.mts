@@ -37,19 +37,19 @@ function evaluate(source: string, options: PluginOptions = {}) {
   return JSON.parse(JSON.stringify(context.module.exports)) as { calls: unknown[][] };
 }
 
-void test('the package runtime entry still resolves to the Wasm artifact', () => {
+test('the package runtime entry still resolves to the Wasm artifact', () => {
   const require = createRequire(import.meta.url);
   assert.equal(require.resolve('swc-plugin-transform-invariant-warning'), plugin);
 });
 
-void test('warning arguments are never evaluated', () => {
+test('warning arguments are never evaluated', () => {
   assert.deepEqual(
     evaluate("import warning from 'warning'; warning(false, missing()); exports.done = true;"),
     { calls: [], done: true },
   );
 });
 
-void test('invariant evaluates its condition once and drops diagnostic arguments', () => {
+test('invariant evaluates its condition once and drops diagnostic arguments', () => {
   assert.deepEqual(
     evaluate(
       "import invariant from 'invariant'; let checks = 0; invariant(checks++, missing()); invariant(++checks, missing()); exports.checks = checks;",
@@ -72,7 +72,7 @@ for (const [kind, packages] of Object.entries(sources)) {
       `const renamed = require('${source}');`,
       `import renamed = require('${source}');`,
     ]) {
-      void test(`recognizes ${declaration}`, () => {
+      test(`recognizes ${declaration}`, () => {
         assert.deepEqual(
           evaluate(`${declaration} renamed(false, missing());`).calls,
           kind === 'warning' ? [] : [[false]],
@@ -82,7 +82,7 @@ for (const [kind, packages] of Object.entries(sources)) {
   }
 }
 
-void test('hey-listen named exports are classified by their exported names', () => {
+test('hey-listen named exports are classified by their exported names', () => {
   assert.deepEqual(
     evaluate(
       "import { warning as warn, invariant as check } from 'hey-listen'; warn(false, missing()); check(false, missing());",
@@ -91,14 +91,14 @@ void test('hey-listen named exports are classified by their exported names', () 
   );
 });
 
-void test('overlapping sources leave ambiguous default exports untouched', () => {
+test('overlapping sources leave ambiguous default exports untouched', () => {
   assert.deepEqual(
     evaluate("import warning from 'hey-listen'; warning(false, 'retained');").calls,
     [[false, 'retained']],
   );
 });
 
-void test('a direct require of an overlapping source remains untouched', () => {
+test('a direct require of an overlapping source remains untouched', () => {
   assert.deepEqual(
     evaluate("const invariant = require('hey-listen'); invariant(false, 'retained');").calls,
     [[false, 'retained']],
@@ -116,7 +116,7 @@ for (const [name, body, checks] of [
   ['label', 'label: BODY', 0],
 ] as const) {
   for (const kind of ['warning', 'invariant']) {
-    void test(`${kind} preserves an unbraced ${name} body`, () => {
+    test(`${kind} preserves an unbraced ${name} body`, () => {
       const code = `let checks = 0; ${body.replace('BODY', `${kind}(true, missing());`)} exports.checks = checks;`;
       assert.deepEqual(evaluate(code), { calls: [], checks });
     });
@@ -124,7 +124,7 @@ for (const [name, body, checks] of [
 }
 
 for (const enabled of [true, false]) {
-  void test(`invariant preserves the outer else (${enabled})`, () => {
+  test(`invariant preserves the outer else (${enabled})`, () => {
     assert.deepEqual(
       evaluate(
         `let checks = 0; if (${enabled}) invariant(++checks, missing()); else exports.fallback = true; exports.checks = checks;`,
@@ -135,7 +135,7 @@ for (const enabled of [true, false]) {
 }
 
 for (const kind of ['warning', 'invariant']) {
-  void test(`preserves local and shadowed ${kind} bindings`, () => {
+  test(`preserves local and shadowed ${kind} bindings`, () => {
     assert.deepEqual(
       evaluate(
         `import ${kind} from '${kind}'; function run(${kind}) { ${kind}(true, 'runtime'); } run((...args) => exports.calls.push(args)); ${kind}(true, missing());`,
@@ -153,7 +153,7 @@ for (const kind of ['warning', 'invariant']) {
   });
 }
 
-void test('preserves block and catch shadows', () => {
+test('preserves block and catch shadows', () => {
   assert.deepEqual(
     evaluate(
       "import warning from 'warning'; { const warning = value => exports.calls.push(value); warning('block'); } try { throw value => exports.calls.push(value); } catch (warning) { warning('catch'); } warning(missing());",
@@ -162,7 +162,7 @@ void test('preserves block and catch shadows', () => {
   );
 });
 
-void test('preserves unrelated imports, named exports and namespace members', () => {
+test('preserves unrelated imports, named exports and namespace members', () => {
   assert.deepEqual(
     evaluate(
       "import warning from 'runtime'; warning('runtime'); import { other as invariant } from 'invariant'; import * as helpers from 'hey-listen'; helpers.warning('member');",
@@ -175,7 +175,7 @@ void test('preserves unrelated imports, named exports and namespace members', ()
   );
 });
 
-void test('does not recognize a shadowed require', () => {
+test('does not recognize a shadowed require', () => {
   assert.deepEqual(
     evaluate(
       "function run(require) { const warning = require('warning'); warning('runtime'); } run(() => (...args) => exports.calls.push(args));",
@@ -184,7 +184,7 @@ void test('does not recognize a shadowed require', () => {
   );
 });
 
-void test('source overrides replace defaults and permit custom packages', () => {
+test('source overrides replace defaults and permit custom packages', () => {
   assert.deepEqual(
     evaluate(
       "import warning from 'warning'; import custom from 'custom'; warning(false, 'retained'); custom(false, missing());",
@@ -200,7 +200,7 @@ void test('source overrides replace defaults and permit custom packages', () => 
   );
 });
 
-void test('global rewriting is independently configurable', () => {
+test('global rewriting is independently configurable', () => {
   assert.deepEqual(
     evaluate("warning(false, 'retained'); invariant(false, 'retained');", {
       transformGlobals: false,
@@ -219,7 +219,7 @@ void test('global rewriting is independently configurable', () => {
   assert.deepEqual(evaluate('warning(missing()); invariant(false, missing());').calls, [[false]]);
 });
 
-void test('preserves calls used as values', () => {
+test('preserves calls used as values', () => {
   assert.deepEqual(
     evaluate(
       "exports.result = warning(true, 'value'); function get() { return invariant(true, 'returned'); } get();",
@@ -231,23 +231,23 @@ void test('preserves calls used as values', () => {
   );
 });
 
-void test('zero-argument invariants and spread-first invariants remain untouched', () => {
+test('zero-argument invariants and spread-first invariants remain untouched', () => {
   assert.deepEqual(evaluate("invariant(); invariant(...[false, 'spread']);").calls, [
     [],
     [false, 'spread'],
   ]);
 });
 
-void test('removes optional and generic warning calls', () => {
+test('removes optional and generic warning calls', () => {
   assert.deepEqual(evaluate('warning?.(missing()); warning<unknown>(missing());').calls, []);
 });
 
-void test('preserves optional invariant short-circuiting', () => {
+test('preserves optional invariant short-circuiting', () => {
   const code = compile('invariant?.(missing(), missing());');
   vm.runInNewContext(code, { invariant: undefined });
 });
 
-void test('preserves optional invariant arguments and their evaluation order when defined', () => {
+test('preserves optional invariant arguments and their evaluation order when defined', () => {
   assert.deepEqual(
     evaluate(`
       const events = [];
@@ -266,7 +266,7 @@ void test('preserves optional invariant arguments and their evaluation order whe
   );
 });
 
-void test('preserves reassigned require bindings conservatively', () => {
+test('preserves reassigned require bindings conservatively', () => {
   assert.deepEqual(
     evaluate(
       "let warning = require('warning'); warning = (...args) => exports.calls.push(args); warning('runtime');",
@@ -285,7 +285,7 @@ for (const kind of ['warning', 'invariant']) {
     ['for-of var target', 'for (var helper of [runtime]) {}'],
     ['repeated var initialization', 'var helper = runtime;'],
   ]) {
-    void test(`preserves ${kind} calls around ${name}`, () => {
+    test(`preserves ${kind} calls around ${name}`, () => {
       assert.deepEqual(
         evaluate(`
           var helper = require('${kind}');
@@ -307,7 +307,7 @@ for (const kind of ['warning', 'invariant']) {
     ['object rest destructuring', '({ ...helper } = { retained: true });'],
     ['for-in target', 'for (helper in { key: true }) {}'],
   ]) {
-    void test(`preserves the ${kind} call failure after ${name}`, () => {
+    test(`preserves the ${kind} call failure after ${name}`, () => {
       assert.throws(
         () => evaluate(`var helper = require('${kind}'); ${assignment} helper(true, 'retained');`),
         /helper is not a function/,
@@ -325,7 +325,7 @@ for (const options of [
   { transformGlobals: null },
   null,
 ]) {
-  void test(`rejects invalid options ${JSON.stringify(options)}`, () => {
+  test(`rejects invalid options ${JSON.stringify(options)}`, () => {
     assert.throws(() => compile('warning(false);', options as unknown as PluginOptions));
   });
 }
@@ -339,7 +339,7 @@ for (const [name, source] of [
     "import warning from 'warning'; export const result = warning(true, 'retained');",
   ],
 ]) {
-  void test(`leaves SWC output and maps unchanged for ${name}`, () => {
+  test(`leaves SWC output and maps unchanged for ${name}`, () => {
     const options: Options = {
       filename: 'fixture.ts',
       sourceMaps: true,
