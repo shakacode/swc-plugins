@@ -46,6 +46,15 @@ area changed:
 - `js:` — shared JavaScript or TypeScript code across plugins.
 - `all:` — changes spanning multiple plugins or areas without a more specific scope.
 
+Commit subjects and pull request titles are checked by commitlint in CI, including
+when a PR title is edited. Titles must follow the same format because they become
+squash commit subjects. Plugin scopes are discovered from package directories.
+Automatically generated merge and revert subjects are also required to follow
+this format; use a scoped subject when making those commits.
+
+Run `pnpm exec commitlint --last` to check the latest local commit, or `pnpm exec commitlint --from origin/main --to HEAD` to check a branch.
+Local Git hooks are optional and are not installed automatically.
+
 Write changelog entries for users separately from commit messages.
 
 Plugin option declarations are generated from Rust with `ts-rs`. After changing
