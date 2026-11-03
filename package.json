@@ -2,7 +2,7 @@
   "name": "swc-plugins-workspace",
   "private": true,
   "scripts": {
-    "build": "cargo build --locked --release --target wasm32-wasip1 && node scripts/copy-wasm.mjs",
+    "build": "cargo build --locked --release --target wasm32-wasip1 && node scripts/copy-wasm.mts",
     "test": "cargo test --locked --workspace && pnpm test:js && pnpm test:commitlint",
     "test:js": "pnpm -r test",
     "lint": "oxlint -c .oxlintrc.jsonc --deny-warnings . && cargo clippy --locked --workspace --all-targets -- -D warnings",
