@@ -23,7 +23,9 @@ including a weekly scheduled run. Run `pnpm update rspack-latest` to refresh it
 locally; `rspack-earliest` stays pinned to 2.2.0.
 
 Run `pnpm format` to format supported files with Oxfmt and Rust with rustfmt.
-Oxlint and Clippy check JavaScript and Rust respectively.
+Oxlint checks JavaScript and TypeScript, including rules that use TypeScript type
+information. Clippy checks Rust. Root tooling uses `tsconfig.json`; each package
+has its own TypeScript project.
 
 Each package's changelog follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Record user-visible changes under `Unreleased` in the affected package's

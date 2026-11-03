@@ -28,7 +28,7 @@ for (const [endpoint, host] of [
   ['earliest', earliest],
   ['latest', latest],
 ] as const) {
-  test(`one Wasm artifact works on the ${endpoint} supported Rspack`, async (t) => {
+  void test(`one Wasm artifact works on the ${endpoint} supported Rspack`, async (t) => {
     const directory = await mkdtemp(path.join(tmpdir(), 'swc-plugin-test-'));
     t.after(() => rm(directory, { recursive: true, force: true }));
     await writeFile(path.join(directory, 'entry.ts'), fixture);

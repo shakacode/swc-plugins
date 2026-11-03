@@ -17,7 +17,7 @@ for (const subject of [
   'all: update multiple plugins',
   'transform-invariant-warning: preserve bindings',
 ]) {
-  test(`accepts ${subject}`, () => {
+  void test(`accepts ${subject}`, () => {
     const result = execCommitlint([], { input: subject });
     assert.equal(result.status, 0, result.stdout + result.stderr);
   });
@@ -34,14 +34,14 @@ for (const subject of [
   'docs:  extra space',
   'Merge pull request #1',
 ]) {
-  test(`rejects ${JSON.stringify(subject)}`, () => {
+  void test(`rejects ${JSON.stringify(subject)}`, () => {
     const result = execCommitlint([], { input: subject });
     assert.equal(result.status, 1, result.stdout + result.stderr);
     assert.match(result.stdout + result.stderr, /scope|subject|header/i);
   });
 }
 
-test('CI checks edited PR titles and the complete commit range without executing title text', (t) => {
+void test('CI checks edited PR titles and the complete commit range without executing title text', (t) => {
   const directory = mkdtempSync(path.join(tmpdir(), 'scoped-commits-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   function git(...args: string[]) {
