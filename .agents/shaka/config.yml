@@ -7,7 +7,7 @@ merge:
   preference: ask
   required_checks:
     - check
-    - commitlint
+    - pr-title
 branches:
   name: '{login}-{host}/{issue}-{description}'
 wip:
