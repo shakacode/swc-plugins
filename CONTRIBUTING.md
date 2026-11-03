@@ -32,9 +32,8 @@ subsections only when needed. Describe user impact and omit internal-only change
 At release time, move entries to a versioned section dated `YYYY-MM-DD` and keep
 an empty `Unreleased` section at the top.
 
-Commit messages follow [Scoped Commits](https://scopedcommits.com/), with the
-first line formatted as `<scope>: <description>`. Choose a scope based on the
-area changed:
+Pull request titles follow [Scoped Commits](https://scopedcommits.com/), formatted
+as `<scope>: <description>`. Choose a scope based on the area changed:
 
 - `<plugin-directory>:` — changes limited to one plugin, including its tests and
   documentation; for example, `transform-invariant-warning: preserve shadowed bindings`.
@@ -46,18 +45,35 @@ area changed:
 - `js:` — shared JavaScript or TypeScript code across plugins.
 - `all:` — changes spanning multiple plugins or areas without a more specific scope.
 
-Commit subjects and pull request titles are checked by commitlint in CI, including
-when a PR title is edited. Titles must follow the same format because they become
-squash commit subjects. Plugin scopes are discovered from package directories.
-Automatically generated merge and revert subjects are also required to follow
-this format; use a scoped subject when making those commits.
+Pull request titles are checked by commitlint in CI, including when a title is
+edited. Plugin scopes are discovered from package directories. Individual commits
+within a PR may use any clear message.
 
-Run `pnpm exec commitlint --last` to check the latest local commit, or `pnpm exec commitlint --from origin/main --to HEAD` to check a branch.
-Local Git hooks are optional and are not installed automatically.
+The repository allows squash merging only and defaults the squash commit message
+to the PR title. Preserve that title when merging so `main` has one scoped commit
+per PR.
 
-Write changelog entries for users separately from commit messages.
+To check a title locally:
+
+```sh
+printf '%s\n' 'tooling: improve CI' | pnpm exec commitlint
+```
+
+Write changelog entries for users separately from PR titles.
 
 Plugin option declarations are generated from Rust with `ts-rs`. After changing
 the options struct, run `pnpm types:generate` and commit the generated declaration.
 Rust tests and CI verify that the declaration is up to date; edit the Rust source
 instead of editing the generated file directly.
+
+## Splitting changes into PRs
+
+Split substantial changes into logical, independently reviewable PRs. Use
+[stacked PRs](https://docs.github.com/en/pull-requests/how-tos/create-pull-requests/creating-stacked-pull-requests)
+when a part depends on an earlier part, with each PR targeting the branch below
+it. Open independent parts as separate PRs targeting the intended base branch.
+Choose boundaries that make each PR coherent, understandable, and verifiable.
+
+Keep each layer's description focused on its own changes and explain its
+relationship to the rest of the stack. Run the applicable checks for each layer
+and update dependent branches when an earlier layer changes.

@@ -1,7 +1,7 @@
 # Development instructions
 
 Read and follow [CONTRIBUTING.md](CONTRIBUTING.md) for development setup,
-validation, compatibility testing, commit messages, and changelog updates.
+validation, compatibility testing, PR titles, and changelog updates.
 
 - Implement plugins in Rust under `crates/`; npm packages live under `packages/`.
 - Keep specs and local planning artifacts ignored by Git.
