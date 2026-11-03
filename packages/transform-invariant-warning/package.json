@@ -9,6 +9,11 @@
     "warning"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shakacode/swc-plugins.git",
+    "directory": "packages/transform-invariant-warning"
+  },
   "files": [
     "plugin.wasm",
     "README.md",
@@ -23,6 +28,9 @@
       "types": "./index.d.ts",
       "default": "./plugin.wasm"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "test": "node --test --test-isolation=none tests/*.test.mts",

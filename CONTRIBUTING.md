@@ -85,3 +85,85 @@ Choose boundaries that make each PR coherent, understandable, and verifiable.
 Keep each layer's description focused on its own changes and explain its
 relationship to the rest of the stack. Run the applicable checks for each layer
 and update dependent branches when an earlier layer changes.
+
+## Releasing a plugin
+
+Plugins have independent versions. Each npm package and its matching Rust crate
+share a version; other plugins are unaffected. The release flow follows
+[ShakaPerf's package-specific tags and publishing workflow](https://github.com/shakacode/shakaperf/blob/main/.github/workflows/publish.yml),
+with a changelog-driven `script/release` entry point like
+[React on Rails](https://github.com/shakacode/react_on_rails/blob/master/script/release).
+
+Prepare a release on a branch:
+
+For release preparation or a catch-up audit, agents can use the repository's
+[update-changelog skill](.agents/skills/update-changelog/SKILL.md) to review
+merged changes, fill missing entries, suggest a version, and prepare a release
+PR. The scripts below perform the mechanical changes and also work without an
+agent. Ordinary PR changelog entries only need the changelog guidance above.
+Publishing is a separate post-merge action.
+
+Invoke it as `$update-changelog` in Codex or `/update-changelog` in Claude Code.
+Other agents can read the linked `SKILL.md` directly. The canonical skill lives
+under `.agents/skills/`; `.claude/skills` links to that directory, so all
+repository skills have one maintained copy.
+
+1. Run `script/update-changelog transform-invariant-warning 0.1.0`. This moves
+   that package's `Unreleased` entries into a dated version section, keeping an
+   empty `Unreleased` section above it and preserving older releases. The date
+   defaults to today in your local timezone; use `--date YYYY-MM-DD` to override
+   it or `--dry-run` to preview without writing. Prereleases use npm SemVer, for
+   example `0.2.0-rc.1`. Empty entries, invalid versions, and versions no newer
+   than the current package or any changelog release are rejected. The first
+   release may use the package's existing initial version. Upward version jumps
+   are allowed; the script does not impose a one-step bump policy.
+2. Run `script/release transform-invariant-warning --prepare`. This reads the
+   version from the changelog and updates that package's `package.json`, its
+   crate's `Cargo.toml`, and `Cargo.lock`. It does not commit or publish.
+3. Run the standard validation and merge these changes through a release PR.
+
+Then update your clean `main` checkout from `origin/main` and run:
+
+```sh
+script/release transform-invariant-warning --dry-run
+script/release transform-invariant-warning
+```
+
+The dry run prints the version, tag, distribution tag, and release notes without
+changing files or contacting the network. The live command checks that `main`
+matches `origin/main`, then creates and pushes an annotated tag such as
+`swc-plugin-transform-invariant-warning@0.1.0`. It does not push commits to `main`.
+Run the command once for each package being released.
+
+The `publish.yml` workflow builds and tests the tagged revision, including the
+same Wasm artifact on the earliest and latest supported Rspack releases. It checks
+that the tag, npm version, Rust version, and changelog agree and that the tagged
+commit is on `origin/main`. It packs and publishes only the selected package,
+then creates a GitHub release using that package's changelog notes. Stable
+versions use npm's `latest` tag; prereleases use `next` and are marked as
+prereleases on GitHub. Package releases do not set a repository-wide GitHub
+“latest release.”
+
+### Publishing credentials
+
+Configure an [npm trusted publisher](https://docs.npmjs.com/trusted-publishers/)
+for each package: organization `shakacode`, repository `swc-plugins`, workflow
+`publish.yml`, with direct `npm publish` allowed. GitHub Actions uses OIDC; no
+long-lived npm credential is needed once this is configured. The workflow uses
+`pnpm pack` and npm's current CLI for publishing because the pinned pnpm 8 does
+not support npm's OIDC authentication. Node from `.node-version` includes a
+sufficiently recent npm CLI.
+
+For a new npm package, bootstrap its first publish with a maintainer-authorized
+publishing credential in the repository's `NPM_TOKEN` Actions secret. Once the
+package exists, configure its trusted publisher and remove the bootstrap secret.
+Only configure the trusted publisher when ready to publish: npm requires its
+first successful publish within two days. Publishing provenance is generated
+automatically with OIDC for this public repository.
+
+If a workflow fails before publication, fix the external problem and rerun that
+workflow at the existing tag. Do not move an existing release tag. If npm
+publication succeeded but GitHub release creation failed, finish the GitHub
+release separately with `gh release create`, using the existing tag and notes
+from the corresponding package changelog; rerunning npm publication of that
+version will fail because npm versions are immutable.

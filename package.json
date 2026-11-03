@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "build": "cargo build --locked --release --target wasm32-wasip1 && node scripts/copy-wasm.mts",
-    "test": "cargo test --locked --workspace && pnpm test:js && pnpm test:commitlint",
+    "test": "cargo test --locked --workspace && pnpm test:js && pnpm test:commitlint && pnpm test:release",
     "test:js": "pnpm -r test",
     "lint": "oxlint -c .oxlintrc.jsonc --deny-warnings . && cargo clippy --locked --workspace --all-targets -- -D warnings",
     "format": "oxfmt -c .oxfmtrc.jsonc . && cargo fmt --all",
@@ -14,18 +14,21 @@
     "commitlint:ci": "node scripts/commitlint-ci.mts",
     "test:commitlint": "node --test --test-isolation=none scripts/commitlint.test.mts",
     "setup": "pnpm install --frozen-lockfile && pnpm build",
-    "validate": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm build && pnpm test"
+    "validate": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm build && pnpm test",
+    "test:release": "node --test --test-isolation=none scripts/release.test.mts"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
     "@jridgewell/trace-mapping": "0.3.31",
     "@swc/core": "1.16.21",
     "@types/node": "24.19.2",
+    "@types/semver": "7.8.0",
     "oxfmt": "0.75.0",
     "oxlint": "1.90.0",
     "oxlint-tsgolint": "7.0.2005",
     "rspack-earliest": "npm:@rspack/core@2.2.0",
     "rspack-latest": "npm:@rspack/core@^2.2.0",
+    "semver": "7.8.6",
     "typescript": "7.0.2"
   },
   "engines": {
