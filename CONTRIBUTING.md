@@ -14,9 +14,7 @@ pnpm format:check
 ```
 
 `pnpm build` compiles the Wasm plugin and copies it into its npm package.
-Build before running JavaScript tests. `pnpm run setup` combines dependency
-installation and the Wasm build; `pnpm run validate` runs formatting, type checking,
-linting, the build, and tests.
+Build before running JavaScript tests.
 
 The integration suite uses the same
 artifact with standalone SWC and the earliest and latest supported Rspack releases
@@ -65,6 +63,9 @@ To check a title locally:
 ```sh
 printf '%s\n' 'tooling: improve CI' | pnpm exec commitlint
 ```
+
+Every pull request must have a description explaining what changed, why, and how
+it was validated; include relevant documentation links.
 
 Write changelog entries for users separately from PR titles.
 
