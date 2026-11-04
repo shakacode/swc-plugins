@@ -322,3 +322,22 @@ test('mutations protect every binding of the same library', () => {
     { value: 42 },
   );
 });
+
+test('retains modules that replace Object or require globals', () => {
+  for (const options of [{}, { removeValidators: true }]) {
+    assert.deepEqual(
+      evaluate(
+        "let calls=0; Object.defineProperty=()=>{calls++}; Object.defineProperty({},'propTypes',{}); exports.calls=calls;",
+        options,
+      ).value,
+      { calls: 1 },
+    );
+    assert.deepEqual(
+      evaluate(
+        "let calls=0; const C={}; require=()=>{calls++;return {}}; const PT=require('prop-types'); C.propTypes={}; exports.calls=calls;",
+        options,
+      ).value,
+      { calls: 1 },
+    );
+  }
+});

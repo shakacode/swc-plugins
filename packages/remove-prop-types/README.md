@@ -81,6 +81,7 @@ The plugin preserves a module when it detects a runtime `propTypes` member read
 or a named `propTypes` export, including CommonJS exports and exports aliases.
 This protection also applies with `removeValidators: true` and does not depend on
 package names. Other definitions in the protected module remain as well.
+Modules that explicitly modify global `Object` or `require` are also retained.
 
 This is a per-module transform. It cannot detect a consumer in another module
 reading an exported component's `propTypes`, dynamically computed property names,

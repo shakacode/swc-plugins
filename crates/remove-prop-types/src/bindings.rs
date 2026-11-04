@@ -96,6 +96,13 @@ pub struct Bindings<'a> {
 }
 
 impl<'a> Bindings<'a> {
+    pub fn globals_modified(&self) -> bool {
+        ["Object", "require"].iter().any(|name| {
+            let id: Id = ((*name).into(), self.unresolved);
+            self.writes.contains(&id)
+        })
+    }
+
     pub fn collect(program: &Program, config: &'a Config, unresolved: SyntaxContext) -> Self {
         #[derive(Default)]
         struct Helpers(HashSet<Id>);

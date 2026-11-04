@@ -190,6 +190,9 @@ pub fn transform(
         return Ok(());
     }
     let bindings = Bindings::collect(program, &config, unresolved);
+    if bindings.globals_modified() {
+        return Ok(());
+    }
     program.visit_mut_with(&mut Rewriter {
         config: &config,
         bindings: &bindings,
