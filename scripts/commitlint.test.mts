@@ -11,11 +11,11 @@ for (const title of [
   'tooling: check PR titles',
   'docs: explain the workflow',
   'deps: update shared dependencies',
-  'release: prepare packages',
   'rust: share transform helpers',
   'js: share test helpers',
   'all: update multiple plugins',
   'transform-invariant-warning: preserve bindings',
+  'transform-invariant-warning: release 0.2.0',
 ]) {
   test(`accepts ${title}`, () => {
     const result = execCommitlint([], { input: title });
@@ -25,6 +25,7 @@ for (const title of [
 
 for (const title of [
   'fix: correct a bug',
+  'release: prepare packages',
   'feat(transform-invariant-warning): add an option',
   'unknown-plugin: add a transform',
   'missing scope',

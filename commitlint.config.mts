@@ -17,11 +17,7 @@ export default {
   },
   rules: {
     'scope-empty': [2, 'never'],
-    'scope-enum': [
-      2,
-      'always',
-      ['tooling', 'docs', 'deps', 'release', 'rust', 'js', 'all', ...plugins],
-    ],
+    'scope-enum': [2, 'always', ['tooling', 'docs', 'deps', 'rust', 'js', 'all', ...plugins]],
     'subject-empty': [2, 'never'],
     'header-trim': [2, 'always'],
   },

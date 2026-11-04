@@ -41,11 +41,11 @@ Pull request titles follow [Scoped Commits](https://scopedcommits.com/), formatt
 as `<scope>: <description>`. Choose a scope based on the area changed:
 
 - `<plugin-directory>:` — changes limited to one plugin, including its tests and
-  documentation; for example, `transform-invariant-warning: preserve shadowed bindings`.
-- `tooling:` — shared build scripts, CI, linting, formatting, and workflow configuration.
+  documentation, and releases; for example,
+  `transform-invariant-warning: release 0.2.0`.
+- `tooling:` — shared build and release scripts, CI, linting, formatting, and workflow configuration.
 - `docs:` — repository-wide documentation and contributor guidance.
 - `deps:` — shared dependency updates; plugin-specific dependencies use the plugin’s scope.
-- `release:` — versioning, packaging, and publishing changes.
 - `rust:` — shared Rust code across plugins.
 - `js:` — shared JavaScript or TypeScript code across plugins.
 - `all:` — changes spanning multiple plugins or areas without a more specific scope.
