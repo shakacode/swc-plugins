@@ -5,9 +5,6 @@ review:
   required: none
 merge:
   preference: ask
-  required_checks:
-    - check
-    - pr-title
 branches:
   name: '{login}-{host}/{issue}-{description}'
 wip:
