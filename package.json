@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck",
     "commitlint": "commitlint",
     "commitlint:ci": "node scripts/commitlint-ci.mts",
-    "test:commitlint": "node --test --test-isolation=none scripts/commitlint.test.mts"
+    "test:commitlint": "node --test --test-isolation=none scripts/commitlint.test.mts",
+    "setup": "pnpm install --frozen-lockfile && pnpm build",
+    "validate": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm build && pnpm test"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",

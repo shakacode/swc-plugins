@@ -64,6 +64,9 @@ To check a title locally:
 printf '%s\n' 'tooling: improve CI' | pnpm exec commitlint
 ```
 
+Every pull request must have a description explaining what changed, why, and how
+it was validated; include relevant documentation links.
+
 Write changelog entries for users separately from PR titles.
 
 Plugin option declarations are generated from Rust with `ts-rs`. After changing
