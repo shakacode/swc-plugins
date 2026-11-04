@@ -93,6 +93,9 @@ impl Visit for RuntimeMetadata {
         member.visit_children_with(self);
     }
     fn visit_assign_expr(&mut self, assignment: &AssignExpr) {
+        if exports_target(&assignment.right, self.unresolved) {
+            self.found = true;
+        }
         if let Some(member) = assignment_member(assignment)
             && member_name(member) == Some("propTypes")
         {

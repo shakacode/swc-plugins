@@ -308,6 +308,15 @@ impl Visit for Bindings<'_> {
         expr.visit_children_with(self);
     }
 
+    fn visit_unary_expr(&mut self, expr: &UnaryExpr) {
+        if expr.op == UnaryOp::Delete {
+            let mut written = Identifiers::default();
+            expr.arg.visit_with(&mut written);
+            self.writes.extend(written.0);
+        }
+        expr.visit_children_with(self);
+    }
+
     fn visit_for_in_stmt(&mut self, stmt: &ForInStmt) {
         let mut written = Identifiers::default();
         stmt.left.visit_with(&mut written);

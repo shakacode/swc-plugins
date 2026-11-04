@@ -252,3 +252,22 @@ test('aggressive validator invocations do not leave calls to null', () => {
     { value: { done: true }, loads: [] },
   );
 });
+
+test('deleting a validator invalidates its binding and aliases', () => {
+  assert.deepEqual(
+    evaluate(
+      "const PT = require('prop-types'); const alias = PT; delete alias.string; exports.absent = PT.string === undefined;",
+      { removeValidators: true },
+    ).value,
+    { absent: true },
+  );
+});
+
+test('preserves exports aliases created by assignment in both modes', () => {
+  for (const options of [{}, { removeValidators: true }]) {
+    assert.deepEqual(
+      evaluate('let target; target = exports; target.propTypes = { field: 42 };', options).value,
+      { propTypes: { field: 42 } },
+    );
+  }
+});
