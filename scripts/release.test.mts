@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { test, type TestContext } from 'node:test';
 import { changelogRelease, main, prepareRelease, publishRelease, releasePlan } from './release.mts';
 import { stampChangelog, updatePackageChangelog } from './update-changelog.mts';
+import { verifyReleaseTag } from './verify-release-tag.mts';
 
 const changelog = (version = '0.2.0', notes = '### Added\n\n- A useful change.') =>
   `# Changelog\n\n## Unreleased\n\n## ${version} - 2026-11-03\n\n${notes}\n\n## 0.1.0 - 2026-10-01\n\n- Older change.\n`;
@@ -299,8 +300,100 @@ test('dry runs do not change files or create tags; live release pushes only a pa
   assert.throws(() => publishRelease(root, 'swc-plugin-alpha@0.2.0'), /ENOENT/);
 });
 
-for (const version of ['0.2.0', '0.2.0-rc.1']) {
-  test(`packs and publishes only the tagged package with its ${version} notes`, (t) => {
+test('release-tag verification accepts merged commits and rejects unmerged or changed tags', (t) => {
+  const { root, git, commit } = fixture(t);
+  git('init', '-q', '-b', 'main');
+  git('config', 'user.name', 'Test');
+  git('config', 'user.email', 'test@example.com');
+  commit();
+  const head = git('rev-parse', 'HEAD');
+  git('update-ref', 'refs/remotes/origin/main', head);
+  git('tag', '-a', 'swc-plugin-alpha@0.2.0', '-m', 'release alpha');
+  assert.deepEqual(verifyReleaseTag(root, 'swc-plugin-alpha@0.2.0', head), {
+    tag: 'swc-plugin-alpha@0.2.0',
+    commit: head,
+    package: 'swc-plugin-alpha',
+  });
+  assert.throws(
+    () => verifyReleaseTag(root, 'swc-plugin-alpha@0.2.0', '0'.repeat(40)),
+    /triggering commit/,
+  );
+  assert.throws(() => verifyReleaseTag(root, 'swc-plugin-alpha@0.2.0', '--all'), /full commit SHA/);
+  assert.throws(() => verifyReleaseTag(root, 'main', head), /release tag/);
+  assert.throws(
+    () => verifyReleaseTag(root, 'swc-plugin-alpha@0.2.0\npackage=other', head),
+    /release tag/,
+  );
+  git('tag', 'swc-plugin-alpha@0.2.1');
+  assert.equal(verifyReleaseTag(root, 'swc-plugin-alpha@0.2.1', head).commit, head);
+  git('switch', '-c', 'unmerged');
+  writeFileSync(path.join(root, 'pending.txt'), 'unmerged source');
+  commit();
+  const unmerged = git('rev-parse', 'HEAD');
+  git('tag', 'swc-plugin-alpha@0.3.0');
+  assert.throws(() => verifyReleaseTag(root, 'swc-plugin-alpha@0.3.0', unmerged));
+  git('tag', '-f', 'swc-plugin-alpha@0.2.0');
+  assert.throws(() => verifyReleaseTag(root, 'swc-plugin-alpha@0.2.0', head), /triggering commit/);
+});
+
+const publicationCases: {
+  label: string;
+  version: string;
+  distTags?: string;
+  registryError?: string;
+  error?: RegExp;
+}[] = [
+  { label: 'new stable release', version: '0.2.0', distTags: '{"latest":"0.1.0"}' },
+  { label: 'new prerelease', version: '0.2.0-rc.1', distTags: '{"next":"0.2.0-rc.0"}' },
+  { label: 'first publication', version: '0.2.0', registryError: 'E404' },
+  { label: 'missing stable channel', version: '0.2.0', distTags: '{"next":"0.3.0-rc.1"}' },
+  {
+    label: 'older stable retry',
+    version: '0.2.0',
+    distTags: '{"latest":"0.3.0"}',
+    error: /newer than.*latest/,
+  },
+  {
+    label: 'already current stable release',
+    version: '0.2.0',
+    distTags: '{"latest":"0.2.0"}',
+    error: /newer than.*latest/,
+  },
+  {
+    label: 'older prerelease retry',
+    version: '0.2.0-rc.1',
+    distTags: '{"next":"0.3.0-rc.1"}',
+    error: /newer than.*next/,
+  },
+  {
+    label: 'registry outage',
+    version: '0.2.0',
+    registryError: 'E503',
+    error: /Cannot read.*registry/,
+  },
+  {
+    label: 'malformed registry response',
+    version: '0.2.0',
+    distTags: 'not json',
+    error: /Cannot read.*registry/,
+  },
+  {
+    label: 'invalid channel version',
+    version: '0.2.0',
+    distTags: '{"latest":42}',
+    error: /registry.*channel/,
+  },
+  {
+    label: 'invalid registry response shape',
+    version: '0.2.0',
+    distTags: '[]',
+    error: /registry.*response/,
+  },
+];
+
+for (const scenario of publicationCases) {
+  const { version } = scenario;
+  test(`publishing handles ${scenario.label}`, (t) => {
     const { root, git, commit, remote } = fixture(t);
     writeFileSync(path.join(root, 'packages/alpha/CHANGELOG.md'), changelog(version));
     prepareRelease(root, 'alpha');
@@ -325,6 +418,15 @@ const path = require('node:path');
 const tool = path.basename(process.argv[1]);
 const args = process.argv.slice(2);
 const result = { tool, args };
+if (tool === 'npm' && args[0] === 'view') {
+  appendFileSync(process.env.RELEASE_TEST_LOG, JSON.stringify(result) + '\\n');
+  if (process.env.RELEASE_TEST_REGISTRY_ERROR) {
+    console.log(JSON.stringify({ error: { code: process.env.RELEASE_TEST_REGISTRY_ERROR } }));
+    process.exit(1);
+  }
+  console.log(process.env.RELEASE_TEST_DIST_TAGS ?? '{}');
+  process.exit(0);
+}
 if (tool === 'npm') {
   result.manifest = JSON.parse(execFileSync('tar', ['-xOf', args[1], 'package/package.json'], { encoding: 'utf8' }));
   result.files = execFileSync('tar', ['-tzf', args[1]], { encoding: 'utf8' });
@@ -338,7 +440,7 @@ appendFileSync(process.env.RELEASE_TEST_LOG, JSON.stringify(result) + '\\n');
       writeFileSync(file, stub);
       chmodSync(file, 0o755);
     }
-    execFileSync(
+    const execution = spawnSync(
       process.execPath,
       [
         '--input-type=module',
@@ -351,10 +453,13 @@ appendFileSync(process.env.RELEASE_TEST_LOG, JSON.stringify(result) + '\\n');
       ],
       {
         cwd: root,
+        encoding: 'utf8',
         env: {
           ...process.env,
           PATH: `${bin}${path.delimiter}${process.env.PATH}`,
           RELEASE_TEST_LOG: log,
+          RELEASE_TEST_DIST_TAGS: scenario.distTags,
+          RELEASE_TEST_REGISTRY_ERROR: scenario.registryError,
         },
       },
     );
@@ -362,8 +467,16 @@ appendFileSync(process.env.RELEASE_TEST_LOG, JSON.stringify(result) + '\\n');
       .trim()
       .split('\n')
       .map((line) => JSON.parse(line));
-    assert.equal(calls.length, 2);
-    const [npm, gh] = calls;
+    assert.equal(execution.status, scenario.error ? 1 : 0, execution.stderr);
+    assert.equal(calls[0].tool, 'npm');
+    assert.deepEqual(calls[0].args, ['view', 'swc-plugin-alpha', 'dist-tags', '--json']);
+    if (scenario.error) {
+      assert.match(execution.stderr, scenario.error);
+      assert.equal(calls.length, 1, 'registry failures must stop before publication');
+      return;
+    }
+    assert.equal(calls.length, 3);
+    const [, npm, gh] = calls;
     assert.equal(npm.tool, 'npm');
     assert.equal(npm.manifest.name, 'swc-plugin-alpha');
     assert.equal(npm.manifest.version, version);
@@ -372,8 +485,7 @@ appendFileSync(process.env.RELEASE_TEST_LOG, JSON.stringify(result) + '\\n');
     assert.deepEqual(npm.args.slice(2), [
       '--access',
       'public',
-      '--tag',
-      version.includes('-') ? 'next' : 'latest',
+      ...(version.includes('-') ? ['--tag', 'next'] : []),
     ]);
     assert.equal(gh.tool, 'gh');
     assert.equal(gh.args[2], `swc-plugin-alpha@${version}`);

@@ -1,19 +1,46 @@
 name: Publish package
 
 on:
-  push:
-    tags:
-      - 'swc-plugin-*@*'
-
-concurrency:
-  group: publish-${{ github.ref }}
-  cancel-in-progress: false
+  workflow_run:
+    workflows: [Release tag]
+    types: [completed]
 
 permissions:
   contents: read
 
 jobs:
+  verify:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      commit: ${{ steps.release.outputs.commit }}
+      package: ${{ steps.release.outputs.package }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+      - name: Verify the release tag using trusted main code
+        id: release
+        run: node scripts/verify-release-tag.mts --tag "$RELEASE_TAG" --commit "$RELEASE_COMMIT"
+        env:
+          RELEASE_TAG: ${{ github.event.workflow_run.head_branch }}
+          RELEASE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+
   publish:
+    needs: verify
+    environment: npm
+    concurrency:
+      group: publish-${{ needs.verify.outputs.package }}
+      queue: max
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -21,7 +48,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
+          ref: ${{ needs.verify.outputs.commit }}
           fetch-depth: 0
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:
@@ -40,7 +69,8 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - name: Publish tagged package and GitHub release
-        run: node scripts/release.mts --publish "$GITHUB_REF_NAME"
+        run: node scripts/release.mts --publish "$RELEASE_TAG"
         env:
+          RELEASE_TAG: ${{ needs.verify.outputs.tag }}
           GH_TOKEN: ${{ github.token }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

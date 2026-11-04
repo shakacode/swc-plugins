@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { parse } from 'semver';
+import { gt, parse } from 'semver';
 
 const repository = 'shakacode/swc-plugins';
 export function parseReleaseVersion(version: unknown) {
@@ -121,6 +121,42 @@ export function prepareRelease(root: string, directory: string) {
   );
 }
 
+function requireChannelAdvance(root: string, plan: ReturnType<typeof releasePlan>) {
+  let tags: unknown;
+  try {
+    tags = JSON.parse(command(root, 'npm', ['view', plan.name, 'dist-tags', '--json']));
+  } catch (error) {
+    if (error instanceof Error && 'stdout' in error && typeof error.stdout === 'string') {
+      try {
+        const failure = JSON.parse(error.stdout) as { error?: { code?: string } };
+        if (failure?.error?.code === 'E404') {
+          return;
+        }
+      } catch {
+        // Malformed error responses remain failures below.
+      }
+    }
+    throw new Error(`Cannot read ${plan.name} release channels from the registry`, {
+      cause: error,
+    });
+  }
+  if (!tags || typeof tags !== 'object' || Array.isArray(tags)) {
+    throw new Error('Invalid registry distribution-tag response');
+  }
+  const current = (tags as Record<string, unknown>)[plan.distTag];
+  if (current === undefined) {
+    return;
+  }
+  if (typeof current !== 'string' || !parse(current)) {
+    throw new Error(`Invalid registry ${plan.distTag} channel version`);
+  }
+  if (!gt(plan.version, current)) {
+    throw new Error(
+      `Release ${plan.version} must be newer than ${plan.distTag} version ${current}`,
+    );
+  }
+}
+
 export function publishRelease(root: string, tag: string) {
   const directories = readdirSync(path.join(root, 'packages'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -146,6 +182,7 @@ export function publishRelease(root: string, tag: string) {
   if (!wasm.subarray(0, 8).equals(Buffer.from([0, 97, 115, 109, 1, 0, 0, 0]))) {
     throw new Error('Build the plugin before publishing');
   }
+  requireChannelAdvance(root, plan);
   const temporary = mkdtempSync(path.join(tmpdir(), 'swc-release-'));
   try {
     command(plan.packageDirectory, 'pnpm', ['pack', '--pack-destination', temporary]);
@@ -156,7 +193,13 @@ export function publishRelease(root: string, tag: string) {
     // npm's current CLI supports OIDC trusted publishing; pnpm 8 does not.
     execFileSync(
       'npm',
-      ['publish', path.join(temporary, tarballs[0]!), '--access', 'public', '--tag', plan.distTag],
+      [
+        'publish',
+        path.join(temporary, tarballs[0]!),
+        '--access',
+        'public',
+        ...(plan.distTag === 'next' ? ['--tag', 'next'] : []),
+      ],
       { cwd: root, stdio: 'inherit' },
     );
     const notes = path.join(temporary, 'notes.md');

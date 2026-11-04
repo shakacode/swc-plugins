@@ -1,0 +1,14 @@
+name: Release tag
+
+on:
+  push:
+    tags:
+      - 'swc-plugin-*@*'
+
+permissions: {}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Release tag received; publishing continues from main.'

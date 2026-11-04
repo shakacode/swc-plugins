@@ -135,34 +135,51 @@ matches `origin/main`, then creates and pushes an annotated tag such as
 `swc-plugin-transform-invariant-warning@0.1.0`. It does not push commits to `main`.
 Run the command once for each package being released.
 
-The `publish.yml` workflow builds and tests the tagged revision, including the
-same Wasm artifact on the earliest and latest supported Rspack releases. It checks
-that the tag, npm version, Rust version, and changelog agree and that the tagged
-commit is on `origin/main`. It packs and publishes only the selected package,
-then creates a GitHub release using that package's changelog notes. Stable
-versions use npm's `latest` tag; prereleases use `next` and are marked as
-prereleases on GitHub. Package releases do not set a repository-wide GitHub
-“latest release.”
+The tag push starts the unprivileged `release-tag.yml` workflow, which automatically
+triggers `publish.yml` from the default branch. No separate local dispatch command
+is needed. The publishing workflow verifies the tag's exact commit and ancestry
+on `origin/main` using trusted main code before checking out any tagged source.
+It builds and tests that revision, including the same Wasm artifact on the earliest
+and latest supported Rspack releases, and checks that package/crate versions and
+the changelog agree. It packs and publishes only the selected package, then creates
+a GitHub release using that package's changelog notes.
+
+Publishing jobs for the same package are queued and serialized. Immediately before publication,
+the script checks that the release is newer than the registry's current channel;
+registry failures stop publication, except a package-not-found response for the
+first release. Stable versions use npm's default `latest` tag and its older-version
+check. Prereleases explicitly use `next` and are marked as prereleases on GitHub.
+Package releases do not set a repository-wide GitHub “latest release.”
 
 ### Publishing credentials
 
+The GitHub `npm` environment must allow the `main` branch only, using a branch
+policy with no tag policies. `publish.yml` runs from `main` even though it checks
+out a verified release commit. This restriction needs no manual approval and
+prevents a workflow on an unmerged branch or tag from accessing publishing
+credentials. It is enforced by GitHub, outside the tagged source.
+
 Configure an [npm trusted publisher](https://docs.npmjs.com/trusted-publishers/)
 for each package: organization `shakacode`, repository `swc-plugins`, workflow
-`publish.yml`, with direct `npm publish` allowed. GitHub Actions uses OIDC; no
+`publish.yml`, environment `npm`, with direct `npm publish` allowed. The environment
+name is required for this setup: omitting it would allow other refs to request
+publishing credentials. GitHub Actions uses OIDC; no
 long-lived npm credential is needed once this is configured. The workflow uses
 `pnpm pack` and npm's current CLI for publishing because the pinned pnpm 8 does
 not support npm's OIDC authentication. Node from `.node-version` includes a
 sufficiently recent npm CLI.
 
 For a new npm package, bootstrap its first publish with a maintainer-authorized
-publishing credential in the repository's `NPM_TOKEN` Actions secret. Once the
+publishing credential in the `npm` environment's `NPM_TOKEN` Actions secret.
+Do not store that token as a repository-wide secret. Once the
 package exists, configure its trusted publisher and remove the bootstrap secret.
 Only configure the trusted publisher when ready to publish: npm requires its
 first successful publish within two days. Publishing provenance is generated
 automatically with OIDC for this public repository.
 
 If a workflow fails before publication, fix the external problem and rerun that
-workflow at the existing tag. Do not move an existing release tag. If npm
+publishing workflow for the existing tag. A retry is rejected if an equal or newer
+version already occupies its channel. Do not move an existing release tag. If npm
 publication succeeded but GitHub release creation failed, finish the GitHub
 release separately with `gh release create`, using the existing tag and notes
 from the corresponding package changelog; rerunning npm publication of that
