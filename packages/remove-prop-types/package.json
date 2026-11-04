@@ -1,0 +1,39 @@
+{
+  "name": "swc-plugin-remove-prop-types",
+  "version": "0.1.0",
+  "description": "Production removal of React propTypes with binding-aware dependency pruning",
+  "keywords": [
+    "prop-types",
+    "react",
+    "rspack",
+    "swc-plugin"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shakacode/swc-plugins.git",
+    "directory": "packages/remove-prop-types"
+  },
+  "files": [
+    "plugin.wasm",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "index.d.ts"
+  ],
+  "main": "plugin.wasm",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./plugin.wasm"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test --test-isolation=none tests/*.test.mts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

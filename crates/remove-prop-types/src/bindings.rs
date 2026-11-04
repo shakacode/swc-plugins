@@ -1,0 +1,400 @@
+use std::collections::{HashMap, HashSet, VecDeque};
+
+use swc_core::{
+    common::SyntaxContext,
+    ecma::{
+        ast::*,
+        visit::{Visit, VisitWith},
+    },
+};
+
+use crate::config::Config;
+
+#[derive(Clone)]
+pub enum Kind {
+    Module,
+    Validator(String),
+}
+
+pub fn text(expr: &Expr) -> Option<&str> {
+    match expr {
+        Expr::Lit(Lit::Str(value)) => value.value.as_str(),
+        Expr::Tpl(value) if value.exprs.is_empty() => {
+            value.quasis.first()?.cooked.as_ref()?.as_str()
+        }
+        _ => None,
+    }
+}
+
+pub fn member_name(member: &MemberExpr) -> Option<&str> {
+    match &member.prop {
+        MemberProp::Ident(name) => Some(name.sym.as_ref()),
+        MemberProp::Computed(key) => text(&key.expr),
+        _ => None,
+    }
+}
+
+pub fn unwrapped(expr: &Expr) -> &Expr {
+    match expr {
+        Expr::Paren(value) => unwrapped(&value.expr),
+        Expr::TsAs(value) => unwrapped(&value.expr),
+        Expr::TsSatisfies(value) => unwrapped(&value.expr),
+        Expr::TsNonNull(value) => unwrapped(&value.expr),
+        Expr::TsTypeAssertion(value) => unwrapped(&value.expr),
+        Expr::TsInstantiation(value) => unwrapped(&value.expr),
+        _ => expr,
+    }
+}
+
+fn interop_argument<'a>(expr: &'a Expr, helpers: &HashSet<Id>) -> Option<&'a Expr> {
+    let Expr::Call(call) = unwrapped(expr) else {
+        return None;
+    };
+    if call.args.len() != 1 || call.args[0].spread.is_some() {
+        return None;
+    }
+    let Callee::Expr(callee) = &call.callee else {
+        return None;
+    };
+    let callee = match unwrapped(callee) {
+        Expr::Member(member) if matches!(member_name(member), Some("_" | "default")) => {
+            unwrapped(&member.obj)
+        }
+        value => value,
+    };
+    let Expr::Ident(ident) = callee else {
+        return None;
+    };
+    helpers
+        .contains(&ident.to_id())
+        .then_some(&*call.args[0].expr)
+}
+
+pub struct Bindings<'a> {
+    pub kinds: HashMap<Id, Kind>,
+    pub all: HashSet<Id>,
+    aliases: HashMap<Id, Vec<Id>>,
+    interop_helpers: HashSet<Id>,
+    writes: HashSet<Id>,
+    declarations: HashMap<Id, usize>,
+    config: &'a Config,
+    unresolved: SyntaxContext,
+}
+
+impl<'a> Bindings<'a> {
+    pub fn collect(program: &Program, config: &'a Config, unresolved: SyntaxContext) -> Self {
+        #[derive(Default)]
+        struct Helpers(HashSet<Id>);
+        impl Visit for Helpers {
+            fn visit_import_decl(&mut self, import: &ImportDecl) {
+                if !import.type_only
+                    && import.src.value.as_str().is_some_and(|source| {
+                        matches!(
+                            source,
+                            "@babel/runtime/helpers/interopRequireDefault"
+                                | "@babel/runtime/helpers/interopRequireWildcard"
+                                | "@babel/runtime/helpers/esm/interopRequireDefault"
+                                | "@babel/runtime/helpers/esm/interopRequireWildcard"
+                                | "@swc/helpers/_/_interop_require_default"
+                                | "@swc/helpers/_/_interop_require_wildcard"
+                        )
+                    })
+                {
+                    for specifier in &import.specifiers {
+                        if !specifier.is_type_only() {
+                            self.0.insert(specifier.local().to_id());
+                        }
+                    }
+                }
+            }
+        }
+        let mut helpers = Helpers::default();
+        program.visit_with(&mut helpers);
+        let mut result = Self {
+            interop_helpers: helpers.0,
+            kinds: HashMap::new(),
+            all: HashSet::new(),
+            aliases: HashMap::new(),
+            writes: HashSet::new(),
+            declarations: HashMap::new(),
+            config,
+            unresolved,
+        };
+        program.visit_with(&mut result);
+        let mut queue: VecDeque<_> = result.kinds.keys().cloned().collect();
+        while let Some(id) = queue.pop_front() {
+            for alias in result.aliases.get(&id).into_iter().flatten() {
+                if !result.kinds.contains_key(alias) {
+                    result
+                        .kinds
+                        .insert(alias.clone(), result.kinds[&id].clone());
+                    queue.push_back(alias.clone());
+                }
+            }
+        }
+        result.writes.extend(
+            result
+                .declarations
+                .iter()
+                .filter(|(_, count)| **count > 1)
+                .map(|(id, _)| id.clone()),
+        );
+        let mut related = result.aliases.clone();
+        for (source, aliases) in &result.aliases {
+            for alias in aliases {
+                related
+                    .entry(alias.clone())
+                    .or_default()
+                    .push(source.clone());
+            }
+        }
+        let mut changed: VecDeque<_> = result.writes.iter().cloned().collect();
+        while let Some(id) = changed.pop_front() {
+            for alias in related.get(&id).into_iter().flatten() {
+                if result.writes.insert(alias.clone()) {
+                    changed.push_back(alias.clone());
+                }
+            }
+        }
+        result.all = result.kinds.keys().cloned().collect();
+        result.kinds.retain(|id, _| !result.writes.contains(id));
+        result
+    }
+
+    fn required(&self, expr: &Expr) -> bool {
+        let expr = interop_argument(expr, &self.interop_helpers).unwrap_or(expr);
+        let Expr::Call(call) = unwrapped(expr) else {
+            return false;
+        };
+        let Callee::Expr(callee) = &call.callee else {
+            return false;
+        };
+        matches!(unwrapped(callee), Expr::Ident(id) if id.sym == "require" && id.ctxt == self.unresolved)
+            && call.args.len() == 1
+            && call.args[0].spread.is_none()
+            && text(&call.args[0].expr).is_some_and(|source| self.config.sources.contains(source))
+    }
+}
+
+impl Visit for Bindings<'_> {
+    fn visit_binding_ident(&mut self, id: &BindingIdent) {
+        *self.declarations.entry(id.to_id()).or_default() += 1;
+        id.visit_children_with(self);
+    }
+    fn visit_fn_decl(&mut self, declaration: &FnDecl) {
+        *self
+            .declarations
+            .entry(declaration.ident.to_id())
+            .or_default() += 1;
+        declaration.visit_children_with(self);
+    }
+    fn visit_import_decl(&mut self, import: &ImportDecl) {
+        for specifier in &import.specifiers {
+            *self
+                .declarations
+                .entry(specifier.local().to_id())
+                .or_default() += 1;
+        }
+        if import.type_only
+            || !import
+                .src
+                .value
+                .as_str()
+                .is_some_and(|source| self.config.sources.contains(source))
+        {
+            return;
+        }
+        for specifier in &import.specifiers {
+            if specifier.is_type_only() {
+                continue;
+            }
+            let kind = match specifier {
+                ImportSpecifier::Named(named) => {
+                    let name = named
+                        .imported
+                        .as_ref()
+                        .map(|name| name.atom().to_string())
+                        .unwrap_or_else(|| named.local.sym.to_string());
+                    if name == "default" {
+                        Kind::Module
+                    } else {
+                        Kind::Validator(name)
+                    }
+                }
+                _ => Kind::Module,
+            };
+            self.kinds.insert(specifier.local().to_id(), kind);
+        }
+    }
+
+    fn visit_ts_import_equals_decl(&mut self, import: &TsImportEqualsDecl) {
+        *self.declarations.entry(import.id.to_id()).or_default() += 1;
+        if !import.is_type_only
+            && let TsModuleRef::TsExternalModuleRef(reference) = &import.module_ref
+            && reference
+                .expr
+                .value
+                .as_str()
+                .is_some_and(|source| self.config.sources.contains(source))
+        {
+            self.kinds.insert(import.id.to_id(), Kind::Module);
+        }
+    }
+
+    fn visit_var_declarator(&mut self, decl: &VarDeclarator) {
+        if let Some(init) = &decl.init {
+            match &decl.name {
+                Pat::Ident(id) if self.required(init) => {
+                    self.kinds.insert(id.to_id(), Kind::Module);
+                }
+                Pat::Ident(id) => {
+                    if let Expr::Ident(source) =
+                        unwrapped(interop_argument(init, &self.interop_helpers).unwrap_or(init))
+                    {
+                        self.aliases
+                            .entry(source.to_id())
+                            .or_default()
+                            .push(id.to_id());
+                    }
+                }
+                Pat::Object(object) if self.required(init) => {
+                    for prop in &object.props {
+                        let binding = match prop {
+                            ObjectPatProp::Assign(prop) if prop.value.is_none() => {
+                                Some((prop.key.to_id(), prop.key.sym.to_string()))
+                            }
+                            ObjectPatProp::KeyValue(prop) => match (&prop.key, &*prop.value) {
+                                (PropName::Ident(key), Pat::Ident(id)) => {
+                                    Some((id.to_id(), key.sym.to_string()))
+                                }
+                                (PropName::Str(key), Pat::Ident(id)) => {
+                                    key.value.as_str().map(|key| (id.to_id(), key.to_owned()))
+                                }
+                                _ => None,
+                            },
+                            _ => None,
+                        };
+                        if let Some((id, name)) = binding {
+                            self.kinds.insert(
+                                id,
+                                if name == "default" {
+                                    Kind::Module
+                                } else {
+                                    Kind::Validator(name)
+                                },
+                            );
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        decl.visit_children_with(self);
+    }
+
+    fn visit_assign_expr(&mut self, expr: &AssignExpr) {
+        // Any write through a binding makes validator substitution unsafe. Pruning
+        // still uses the binding's real references, including this assignment.
+        let mut written = Identifiers::default();
+        expr.left.visit_with(&mut written);
+        self.writes.extend(written.0);
+        expr.visit_children_with(self);
+    }
+
+    fn visit_update_expr(&mut self, expr: &UpdateExpr) {
+        let mut written = Identifiers::default();
+        expr.arg.visit_with(&mut written);
+        self.writes.extend(written.0);
+        expr.visit_children_with(self);
+    }
+
+    fn visit_for_in_stmt(&mut self, stmt: &ForInStmt) {
+        let mut written = Identifiers::default();
+        stmt.left.visit_with(&mut written);
+        self.writes.extend(written.0);
+        stmt.visit_children_with(self);
+    }
+    fn visit_for_of_stmt(&mut self, stmt: &ForOfStmt) {
+        let mut written = Identifiers::default();
+        stmt.left.visit_with(&mut written);
+        self.writes.extend(written.0);
+        stmt.visit_children_with(self);
+    }
+}
+
+#[derive(Default)]
+pub struct Identifiers(pub HashSet<Id>);
+impl Visit for Identifiers {
+    fn visit_ident(&mut self, ident: &Ident) {
+        self.0.insert(ident.to_id());
+    }
+}
+
+pub fn live_bindings(program: &Program, bindings: &HashSet<Id>) -> HashSet<Id> {
+    struct Usage<'a> {
+        bindings: &'a HashSet<Id>,
+        live: HashSet<Id>,
+        dependencies: HashMap<Id, HashSet<Id>>,
+        owner: Option<Id>,
+    }
+    impl Visit for Usage<'_> {
+        fn visit_import_decl(&mut self, _: &ImportDecl) {}
+        fn visit_ts_import_equals_decl(&mut self, import: &TsImportEqualsDecl) {
+            if import.is_export {
+                self.live.insert(import.id.to_id());
+            }
+        }
+        fn visit_var_declarator(&mut self, decl: &VarDeclarator) {
+            if let Pat::Ident(id) = &decl.name
+                && self.bindings.contains(&id.to_id())
+            {
+                let previous = self.owner.replace(id.to_id());
+                decl.init.visit_with(self);
+                self.owner = previous;
+            } else {
+                decl.init.visit_with(self);
+                decl.name.visit_with(self);
+            }
+        }
+        fn visit_binding_ident(&mut self, _: &BindingIdent) {}
+        fn visit_ident(&mut self, ident: &Ident) {
+            let id = ident.to_id();
+            if self.bindings.contains(&id) {
+                if let Some(owner) = &self.owner {
+                    self.dependencies
+                        .entry(owner.clone())
+                        .or_default()
+                        .insert(id);
+                } else {
+                    self.live.insert(id);
+                }
+            }
+        }
+        fn visit_export_decl(&mut self, export: &ExportDecl) {
+            if let Decl::Var(decl) = &export.decl {
+                for declaration in &decl.decls {
+                    let mut ids = Identifiers::default();
+                    declaration.name.visit_with(&mut ids);
+                    self.live.extend(ids.0);
+                }
+            }
+            export.visit_children_with(self);
+        }
+    }
+    let mut usage = Usage {
+        bindings,
+        live: HashSet::new(),
+        dependencies: HashMap::new(),
+        owner: None,
+    };
+    program.visit_with(&mut usage);
+    let mut queue: VecDeque<_> = usage.live.iter().cloned().collect();
+    while let Some(id) = queue.pop_front() {
+        for dependency in usage.dependencies.get(&id).into_iter().flatten() {
+            if usage.live.insert(dependency.clone()) {
+                queue.push_back(dependency.clone());
+            }
+        }
+    }
+    usage.live
+}

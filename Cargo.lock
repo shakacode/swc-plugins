@@ -1221,6 +1221,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "swc-plugin-remove-prop-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "swc_core",
+ "ts-rs",
+]
+
+[[package]]
 name = "swc-plugin-transform-invariant-warning"
 version = "0.1.0"
 dependencies = [

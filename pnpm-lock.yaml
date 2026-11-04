@@ -57,6 +57,8 @@ importers:
         specifier: npm:@rspack/core@^2.2.0
         version: /@rspack/core@2.3.0
 
+  packages/remove-prop-types: {}
+
   packages/transform-invariant-warning:
     devDependencies:
       '@swc-plugins/test-utils':

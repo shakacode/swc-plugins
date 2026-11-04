@@ -28,7 +28,7 @@ jobs:
         run: pnpm update:rspack
       - run: pnpm format:check
       - name: Check generated TypeScript declarations
-        run: cargo test --locked --lib exported_options_are_current
+        run: cargo test --locked --workspace --lib exported_options_are_current
       - run: pnpm typecheck
       - run: pnpm lint
       - name: Build the shared Wasm artifact
@@ -38,5 +38,7 @@ jobs:
       - name: Rust, SWC, and earliest/latest Rspack tests
         run: pnpm test
       - name: Inspect the distributable package
-        working-directory: packages/transform-invariant-warning
-        run: pnpm pack --pack-destination "${{ runner.temp }}"
+        run: |
+          for package in packages/*; do
+            (cd "$package" && pnpm pack --pack-destination "${{ runner.temp }}")
+          done
