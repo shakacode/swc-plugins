@@ -1,7 +1,7 @@
 mod bindings;
 mod config;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use swc_core::{
     common::{Mark, SyntaxContext, util::take::Take},
@@ -21,37 +21,21 @@ pub fn transform(program: &mut Program, unresolved_mark: Mark, config: &str) -> 
     let config = Config::parse(config)?;
     let unresolved = SyntaxContext::empty().apply_mark(unresolved_mark);
     let bindings = Bindings::collect(program, &config, unresolved);
-    program.visit_mut_with(&mut Rewriter {
-        kinds: bindings.kinds,
-        writes: bindings.writes,
-        unresolved,
-        transform_globals: config.transform_globals,
-    });
+    if !bindings.kinds.is_empty() {
+        program.visit_mut_with(&mut Rewriter {
+            kinds: bindings.kinds,
+        });
+    }
     Ok(())
 }
 
 struct Rewriter {
     kinds: HashMap<Id, Kind>,
-    writes: HashSet<Id>,
-    unresolved: SyntaxContext,
-    transform_globals: bool,
 }
 
 impl Rewriter {
     fn kind(&self, ident: &Ident) -> Option<Kind> {
-        self.kinds.get(&ident.to_id()).copied().or_else(|| {
-            if !self.transform_globals
-                || ident.ctxt != self.unresolved
-                || self.writes.contains(&ident.to_id())
-            {
-                return None;
-            }
-            match ident.sym.as_ref() {
-                "warning" => Some(Kind::Warning),
-                "invariant" => Some(Kind::Invariant),
-                _ => None,
-            }
-        })
+        self.kinds.get(&ident.to_id()).copied()
     }
 }
 

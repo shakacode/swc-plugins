@@ -14,14 +14,11 @@ pub struct PluginOptions {
     warning_sources: Vec<String>,
     #[cfg_attr(test, ts(as = "Option<_>", optional))]
     invariant_sources: Vec<String>,
-    #[cfg_attr(test, ts(as = "Option<_>", optional))]
-    transform_globals: bool,
 }
 
 pub struct Config {
     warning_sources: HashSet<String>,
     invariant_sources: HashSet<String>,
-    pub transform_globals: bool,
 }
 
 impl Default for PluginOptions {
@@ -47,7 +44,6 @@ impl Default for PluginOptions {
             .into_iter()
             .map(String::from)
             .collect(),
-            transform_globals: true,
         }
     }
 }
@@ -61,7 +57,6 @@ impl Config {
         Ok(Self {
             warning_sources: options.warning_sources.into_iter().collect(),
             invariant_sources: options.invariant_sources.into_iter().collect(),
-            transform_globals: options.transform_globals,
         })
     }
 

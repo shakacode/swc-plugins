@@ -9,4 +9,4 @@ and this package adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Exported TypeScript `PluginOptions` type, generated from the Rust options schema.
+- Initial release.
