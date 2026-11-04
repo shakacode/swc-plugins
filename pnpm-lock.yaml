@@ -20,6 +20,9 @@ importers:
       '@types/node':
         specifier: 24.19.2
         version: 24.19.2
+      '@types/semver':
+        specifier: 7.8.0
+        version: 7.8.0
       oxfmt:
         specifier: 0.75.0
         version: 0.75.0
@@ -35,6 +38,9 @@ importers:
       rspack-latest:
         specifier: npm:@rspack/core@^2.2.0
         version: /@rspack/core@2.3.0
+      semver:
+        specifier: 7.8.6
+        version: 7.8.6
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -1149,6 +1155,10 @@ packages:
     resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
     dependencies:
       undici-types: 7.24.6
+    dev: true
+
+  /@types/semver@7.8.0:
+    resolution: {integrity: sha512-1mAINjtQCXXeLkJ9ehXkwOcBpqtLxiVtKhpUf83DdRNdQKV0iXZpaHYqRr7nj+wvxuJzoAmAwXI+sCNMv1CzLQ==}
     dev: true
 
   /@typescript/typescript-aix-ppc64@7.0.2:
