@@ -40,8 +40,9 @@ up-to-date branch, and resolved review conversations. It also requires squash
 merges and blocks force-pushes and deletion, with no bypass actors. Shaka reads
 required checks from GitHub; no fallback check list is configured.
 
-No hosted AI-review job is configured; meaningful implementation still gets
-local review through the Shaka workflow.
+The Claude Code Review workflow reviews non-draft, same-repository PRs on opening,
+updates, reopening, and readiness for review. Dependabot runs are excluded.
+Meaningful implementation still gets local review through the Shaka workflow.
 
 Before reporting a PR ready, compare its title's scope with the actual diff using
 the scope guidance in CONTRIBUTING.md. Recommend a corrected title when the scope
