@@ -34,18 +34,34 @@ fn rewrite(source: &str, options: &str) -> Result<String, String> {
 }
 
 #[test]
+fn unresolved_helpers_are_preserved() {
+    let code = rewrite(
+        "warning(sideEffect()); invariant(check(), message());",
+        "{}",
+    )
+    .unwrap();
+    assert!(code.contains("warning(sideEffect())"), "{code}");
+    assert!(code.contains("invariant(check(), message())"), "{code}");
+}
+
+#[test]
 fn warning_statement_is_removed() {
-    assert_eq!(
-        rewrite("warning(false, sideEffect());", "{}")
-            .unwrap()
-            .trim(),
-        ";"
-    );
+    let code = rewrite(
+        "import warning from 'warning'; warning(false, sideEffect());",
+        "{}",
+    )
+    .unwrap();
+    assert!(code.contains("import warning"), "{code}");
+    assert!(!code.contains("sideEffect()"), "{code}");
 }
 
 #[test]
 fn invariant_keeps_only_the_failure_path() {
-    let code = rewrite("invariant(check(), message());", "{}").unwrap();
+    let code = rewrite(
+        "import invariant from 'invariant'; invariant(check(), message());",
+        "{}",
+    )
+    .unwrap();
     assert!(code.contains("if (!check())"), "{code}");
     assert!(code.contains("invariant(false)"), "{code}");
     assert!(!code.contains("message()"), "{code}");

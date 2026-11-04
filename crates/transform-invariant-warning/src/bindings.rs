@@ -12,7 +12,7 @@ use crate::config::{Config, Kind};
 
 pub struct Bindings<'a> {
     pub kinds: HashMap<Id, Kind>,
-    pub writes: HashSet<Id>,
+    writes: HashSet<Id>,
     declarations: HashMap<Id, usize>,
     config: &'a Config,
     unresolved: SyntaxContext,

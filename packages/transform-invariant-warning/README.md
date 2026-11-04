@@ -107,9 +107,9 @@ A source may appear in both lists. Its named exports remain unambiguous; its
 default export, direct `require`, and import-equals bindings are left unchanged.
 CommonJS destructured named bindings are outside the initial scope.
 
-Local functions, parameters, shadowed imports, type-only imports, unrelated
-imports, and shadowed `require` functions are preserved. Bindings with detected
-reassignments are conservatively left unchanged throughout the file.
+Unresolved global calls, local functions, parameters, shadowed imports, type-only
+imports, unrelated imports, and shadowed `require` functions are preserved.
+Bindings with detected reassignments are conservatively left unchanged throughout the file.
 
 ## Options
 
@@ -118,7 +118,7 @@ TypeScript consumers can import the generated options type:
 ```ts
 import type { PluginOptions } from 'swc-plugin-transform-invariant-warning';
 
-const options = { transformGlobals: false } satisfies PluginOptions;
+const options = { invariantSources: ['tiny-invariant'] } satisfies PluginOptions;
 ```
 
 ```json
@@ -136,16 +136,12 @@ const options = { transformGlobals: false } satisfies PluginOptions;
     "fbjs/lib/invariant",
     "fbjs/lib/invariant.js",
     "hey-listen"
-  ],
-  "transformGlobals": true
+  ]
 }
 ```
 
 - `warningSources` and `invariantSources` **replace** their respective defaults.
   An empty array disables recognition of that kind through imports and requires.
-- `transformGlobals` defaults to `true`: unresolved identifiers named `warning`
-  and `invariant` are also rewritten. Set it to `false` to require a recognized
-  import or require binding.
 - Unknown options and invalid option types produce errors.
 
 [ts-invariant](https://github.com/apollographql/invariant-packages/tree/main/packages/ts-invariant)

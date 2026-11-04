@@ -117,7 +117,7 @@ for (const [name, body, checks] of [
 ] as const) {
   for (const kind of ['warning', 'invariant']) {
     test(`${kind} preserves an unbraced ${name} body`, () => {
-      const code = `let checks = 0; ${body.replace('BODY', `${kind}(true, missing());`)} exports.checks = checks;`;
+      const code = `import ${kind} from '${kind}'; let checks = 0; ${body.replace('BODY', `${kind}(true, missing());`)} exports.checks = checks;`;
       assert.deepEqual(evaluate(code), { calls: [], checks });
     });
   }
@@ -127,7 +127,7 @@ for (const enabled of [true, false]) {
   test(`invariant preserves the outer else (${enabled})`, () => {
     assert.deepEqual(
       evaluate(
-        `let checks = 0; if (${enabled}) invariant(++checks, missing()); else exports.fallback = true; exports.checks = checks;`,
+        `import invariant from 'invariant'; let checks = 0; if (${enabled}) invariant(++checks, missing()); else exports.fallback = true; exports.checks = checks;`,
       ),
       enabled ? { calls: [], checks: 1 } : { calls: [], fallback: true, checks: 0 },
     );
@@ -200,29 +200,38 @@ test('source overrides replace defaults and permit custom packages', () => {
   );
 });
 
-test('global rewriting is independently configurable', () => {
-  assert.deepEqual(
-    evaluate("warning(false, 'retained'); invariant(false, 'retained');", {
-      transformGlobals: false,
-    }).calls,
-    [
-      [false, 'retained'],
-      [false, 'retained'],
-    ],
-  );
-  assert.deepEqual(
-    evaluate("import warning from 'warning'; warning(false, missing());", {
-      transformGlobals: false,
-    }).calls,
-    [],
-  );
-  assert.deepEqual(evaluate('warning(missing()); invariant(false, missing());').calls, [[false]]);
-});
+for (const declaration of ['', "import warn from 'warning'; warn(false, missing());"]) {
+  test(`preserves unresolved helpers and argument evaluation with ${declaration || 'no imports'}`, () => {
+    assert.deepEqual(
+      evaluate(`
+        ${declaration}
+        const events = [];
+        function argument(name, value) { events.push(name); return value; }
+        warning(argument('warning condition', false), argument('warning message', 'retained'));
+        invariant(argument('invariant condition', true), argument('invariant message', 'retained'));
+        warning?.(argument('optional warning', 'retained'));
+        invariant<boolean>(argument('generic invariant', false), 'retained');
+        exports.events = events;
+      `),
+      {
+        calls: [[false, 'retained'], [true, 'retained'], ['retained'], [false, 'retained']],
+        events: [
+          'warning condition',
+          'warning message',
+          'invariant condition',
+          'invariant message',
+          'optional warning',
+          'generic invariant',
+        ],
+      },
+    );
+  });
+}
 
 test('preserves calls used as values', () => {
   assert.deepEqual(
     evaluate(
-      "exports.result = warning(true, 'value'); function get() { return invariant(true, 'returned'); } get();",
+      "import warning from 'warning'; import invariant from 'invariant'; exports.result = warning(true, 'value'); function get() { return invariant(true, 'returned'); } get();",
     ).calls,
     [
       [true, 'value'],
@@ -232,24 +241,30 @@ test('preserves calls used as values', () => {
 });
 
 test('zero-argument invariants and spread-first invariants remain untouched', () => {
-  assert.deepEqual(evaluate("invariant(); invariant(...[false, 'spread']);").calls, [
-    [],
-    [false, 'spread'],
-  ]);
+  assert.deepEqual(
+    evaluate("import invariant from 'invariant'; invariant(); invariant(...[false, 'spread']);")
+      .calls,
+    [[], [false, 'spread']],
+  );
 });
 
 test('removes optional and generic warning calls', () => {
-  assert.deepEqual(evaluate('warning?.(missing()); warning<unknown>(missing());').calls, []);
+  assert.deepEqual(
+    evaluate("import warning from 'warning'; warning?.(missing()); warning<unknown>(missing());")
+      .calls,
+    [],
+  );
 });
 
 test('preserves optional invariant short-circuiting', () => {
-  const code = compile('invariant?.(missing(), missing());');
-  vm.runInNewContext(code, { invariant: undefined });
+  const code = compile("import invariant from 'invariant'; invariant?.(missing(), missing());");
+  vm.runInNewContext(code, { exports: {}, require: () => undefined });
 });
 
 test('preserves optional invariant arguments and their evaluation order when defined', () => {
   assert.deepEqual(
     evaluate(`
+      import invariant from 'invariant';
       const events = [];
       function argument(name, value) { events.push(name); return value; }
       invariant?.(argument('condition', false), argument('message', 'retained'));
@@ -318,11 +333,9 @@ for (const kind of ['warning', 'invariant']) {
 
 for (const options of [
   { unknown: true },
-  { transformGlobals: 'yes' },
   { warningSources: 'warning' },
   { invariantSources: [42] },
   { warningSources: null },
-  { transformGlobals: null },
   null,
 ]) {
   test(`rejects invalid options ${JSON.stringify(options)}`, () => {
@@ -332,6 +345,11 @@ for (const options of [
 
 for (const [name, source] of [
   ['ordinary code', '// retained comment\nexport const value: number = 42;'],
+  ['unresolved globals', "warning(false, 'retained'); invariant(false, 'retained');"],
+  [
+    'unresolved globals with a recognized import',
+    "import check from 'invariant'; warning(false, 'retained');",
+  ],
   ['local functions', "function warning(value) { return value; } warning('runtime');"],
   ['unrelated imports', "import invariant from 'runtime'; invariant(false, 'retained');"],
   [
@@ -360,15 +378,11 @@ for (const [name, source] of [
 const typedOptions: PluginOptions = {
   warningSources: ['warning'],
   invariantSources: ['invariant'],
-  transformGlobals: false,
 };
 void typedOptions;
 // @ts-expect-error Source lists contain strings only.
 const invalidSources: PluginOptions = { warningSources: [42] };
 void invalidSources;
-// @ts-expect-error Global rewriting takes a boolean.
-const invalidGlobals: PluginOptions = { transformGlobals: 'yes' };
-void invalidGlobals;
 // @ts-expect-error Unknown options are rejected.
 const invalidOption: PluginOptions = { unknown: true };
 void invalidOption;
