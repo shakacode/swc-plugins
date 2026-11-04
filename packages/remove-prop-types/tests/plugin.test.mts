@@ -7,13 +7,15 @@ import { transformSync } from '@swc/core';
 import type { PluginOptions } from 'swc-plugin-remove-prop-types';
 
 const plugin = fileURLToPath(new URL('../plugin.wasm', import.meta.url));
-const validator = Object.assign(() => null, { isRequired: 'required' });
-const types = {
-  string: validator,
-  number: validator,
-  shape: () => validator,
-  checkPropTypes: () => 'checked',
-};
+function createTypes() {
+  const validator = Object.assign(() => null, { isRequired: 'required' });
+  return {
+    string: validator,
+    number: validator,
+    shape: () => validator,
+    checkPropTypes: () => 'checked',
+  };
+}
 
 export function compile(source: string, options: PluginOptions = {}) {
   return transformSync(source, {
@@ -29,13 +31,14 @@ export function compile(source: string, options: PluginOptions = {}) {
 
 function evaluate(source: string, options: PluginOptions = {}) {
   const loads: string[] = [];
+  const types = createTypes();
   const module = { exports: {} };
   vm.runInNewContext(compile(source, options), {
     module,
     exports: module.exports,
     require: (name: string) => {
       loads.push(name);
-      return { ...types };
+      return types;
     },
   });
   return { value: JSON.parse(JSON.stringify(module.exports)), loads };
@@ -288,5 +291,34 @@ test('loop-header aliases retain their dependencies', () => {
       "const PT = require('prop-types'); for (let alias = PT; false;) {} exports.done = true;",
     ).value,
     { done: true },
+  );
+});
+
+test('unused redeclarations keep unrelated initializer effects', () => {
+  assert.deepEqual(
+    evaluate(
+      "let calls = 0; function record() { calls++; return {}; } var PT = require('prop-types'); var PT = record(); exports.calls = calls;",
+    ).value,
+    { calls: 1 },
+  );
+});
+
+test('mutated validator member aliases keep their runtime values', () => {
+  assert.deepEqual(
+    evaluate(
+      "import PT from 'prop-types'; const validate = PT.string; validate.custom = 42; exports.value = validate.custom;",
+      { removeValidators: true },
+    ).value,
+    { value: 42 },
+  );
+});
+
+test('mutations protect every binding of the same library', () => {
+  assert.deepEqual(
+    evaluate(
+      "const first = require('prop-types'); const second = require('prop-types'); first.string = 42; exports.value = second.string;",
+      { removeValidators: true },
+    ).value,
+    { value: 42 },
   );
 });

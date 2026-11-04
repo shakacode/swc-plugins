@@ -63,8 +63,9 @@ const options: PluginOptions = {
   validator reads with `null`, factory calls with `void 0`, and factory references
   with functions returning `null`. Validator-construction arguments are dropped.
   This deliberately disables standalone validation; unknown members such as
-  `checkPropTypes` remain. Reassigned bindings and property writes prevent
-  validator substitution through that binding and its aliases.
+  `checkPropTypes` remain. Detected mutations and redeclarations prevent
+  substitution or pruning through the affected binding, its direct aliases,
+  and other imports of the same exact library source.
 - `additionalLibraries` adds exact module names to `prop-types`. It does not
   match prefixes, subpaths, or regular expressions. Aggressive substitution
   recognizes the standard validator names on these libraries.
@@ -83,7 +84,9 @@ package names. Other definitions in the protected module remain as well.
 
 This is a per-module transform. It cannot detect a consumer in another module
 reading an exported component's `propTypes`, dynamically computed property names,
-or arbitrary reflection. Exclude those modules from the transform. It does not
+or arbitrary reflection and indirect runtime data flow. These syntactic checks
+are not whole-program heap analysis. Exclude modules that rely on such behavior
+from the transform. It does not
 provide Babel's `wrap` or `unsafe-wrap` modes or assume arbitrary locally defined
 helpers implement `Object.defineProperty` or module interop.
 

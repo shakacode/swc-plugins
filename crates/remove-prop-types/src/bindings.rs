@@ -70,10 +70,24 @@ fn interop_argument<'a>(expr: &'a Expr, helpers: &HashSet<Id>) -> Option<&'a Exp
         .then_some(&*call.args[0].expr)
 }
 
+fn value_root(expr: &Expr) -> Option<&Ident> {
+    match unwrapped(expr) {
+        Expr::Ident(id) => Some(id),
+        Expr::Member(member) => value_root(&member.obj),
+        Expr::Call(call) => match &call.callee {
+            Callee::Expr(callee) => value_root(callee),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 pub struct Bindings<'a> {
     pub kinds: HashMap<Id, Kind>,
     pub all: HashSet<Id>,
     aliases: HashMap<Id, Vec<Id>>,
+    derived: HashMap<Id, Vec<Id>>,
+    sources: HashMap<Id, String>,
     interop_helpers: HashSet<Id>,
     writes: HashSet<Id>,
     declarations: HashMap<Id, usize>,
@@ -115,6 +129,8 @@ impl<'a> Bindings<'a> {
             kinds: HashMap::new(),
             all: HashSet::new(),
             aliases: HashMap::new(),
+            derived: HashMap::new(),
+            sources: HashMap::new(),
             writes: HashSet::new(),
             declarations: HashMap::new(),
             config,
@@ -139,13 +155,26 @@ impl<'a> Bindings<'a> {
                 .filter(|(_, count)| **count > 1)
                 .map(|(id, _)| id.clone()),
         );
-        let mut related = result.aliases.clone();
-        for (source, aliases) in &result.aliases {
+        let mut related: HashMap<Id, Vec<Id>> = HashMap::new();
+        for (source, aliases) in result.aliases.iter().chain(&result.derived) {
             for alias in aliases {
+                related
+                    .entry(source.clone())
+                    .or_default()
+                    .push(alias.clone());
                 related
                     .entry(alias.clone())
                     .or_default()
                     .push(source.clone());
+            }
+        }
+        let mut first_by_source: HashMap<&str, Id> = HashMap::new();
+        for (id, source) in &result.sources {
+            if let Some(first) = first_by_source.get(source.as_str()) {
+                related.entry(first.clone()).or_default().push(id.clone());
+                related.entry(id.clone()).or_default().push(first.clone());
+            } else {
+                first_by_source.insert(source, id.clone());
             }
         }
         let mut changed: VecDeque<_> = result.writes.iter().cloned().collect();
@@ -156,23 +185,32 @@ impl<'a> Bindings<'a> {
                 }
             }
         }
-        result.all = result.kinds.keys().cloned().collect();
         result.kinds.retain(|id, _| !result.writes.contains(id));
+        // A redeclared or mutated binding is no longer a removable library
+        // binding: another initializer can have unrelated application effects.
+        result.all = result.kinds.keys().cloned().collect();
         result
     }
 
-    fn required(&self, expr: &Expr) -> bool {
+    fn required(&self, expr: &Expr) -> Option<String> {
         let expr = interop_argument(expr, &self.interop_helpers).unwrap_or(expr);
         let Expr::Call(call) = unwrapped(expr) else {
-            return false;
+            return None;
         };
         let Callee::Expr(callee) = &call.callee else {
-            return false;
+            return None;
         };
-        matches!(unwrapped(callee), Expr::Ident(id) if id.sym == "require" && id.ctxt == self.unresolved)
-            && call.args.len() == 1
-            && call.args[0].spread.is_none()
-            && text(&call.args[0].expr).is_some_and(|source| self.config.sources.contains(source))
+        if !matches!(unwrapped(callee), Expr::Ident(id) if id.sym == "require" && id.ctxt == self.unresolved)
+            || call.args.len() != 1
+            || call.args[0].spread.is_some()
+        {
+            return None;
+        }
+        let source = text(&call.args[0].expr)?;
+        self.config
+            .sources
+            .contains(source)
+            .then(|| source.to_owned())
     }
 }
 
@@ -224,6 +262,10 @@ impl Visit for Bindings<'_> {
                 _ => Kind::Module,
             };
             self.kinds.insert(specifier.local().to_id(), kind);
+            self.sources.insert(
+                specifier.local().to_id(),
+                import.src.value.as_str().unwrap().to_owned(),
+            );
         }
     }
 
@@ -238,14 +280,21 @@ impl Visit for Bindings<'_> {
                 .is_some_and(|source| self.config.sources.contains(source))
         {
             self.kinds.insert(import.id.to_id(), Kind::Module);
+            self.sources.insert(
+                import.id.to_id(),
+                reference.expr.value.as_str().unwrap().to_owned(),
+            );
         }
     }
 
     fn visit_var_declarator(&mut self, decl: &VarDeclarator) {
         if let Some(init) = &decl.init {
+            let required_source = self.required(init);
             match &decl.name {
-                Pat::Ident(id) if self.required(init) => {
+                Pat::Ident(id) if required_source.is_some() => {
                     self.kinds.insert(id.to_id(), Kind::Module);
+                    self.sources
+                        .insert(id.to_id(), required_source.clone().unwrap());
                 }
                 Pat::Ident(id) => {
                     if let Expr::Ident(source) =
@@ -255,9 +304,14 @@ impl Visit for Bindings<'_> {
                             .entry(source.to_id())
                             .or_default()
                             .push(id.to_id());
+                    } else if let Some(source) = value_root(init) {
+                        self.derived
+                            .entry(source.to_id())
+                            .or_default()
+                            .push(id.to_id());
                     }
                 }
-                Pat::Object(object) if self.required(init) => {
+                Pat::Object(object) if required_source.is_some() => {
                     for prop in &object.props {
                         let binding = match prop {
                             ObjectPatProp::Assign(prop) if prop.value.is_none() => {
@@ -275,6 +329,8 @@ impl Visit for Bindings<'_> {
                             _ => None,
                         };
                         if let Some((id, name)) = binding {
+                            self.sources
+                                .insert(id.clone(), required_source.clone().unwrap());
                             self.kinds.insert(
                                 id,
                                 if name == "default" {
