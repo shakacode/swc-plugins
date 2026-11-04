@@ -345,8 +345,15 @@ pub fn live_bindings(program: &Program, bindings: &HashSet<Id>) -> HashSet<Id> {
         live: HashSet<Id>,
         dependencies: HashMap<Id, HashSet<Id>>,
         owner: Option<Id>,
+        prunable_declaration: bool,
     }
     impl Visit for Usage<'_> {
+        fn visit_stmt(&mut self, statement: &Stmt) {
+            let previous = self.prunable_declaration;
+            self.prunable_declaration = matches!(statement, Stmt::Decl(Decl::Var(_)));
+            statement.visit_children_with(self);
+            self.prunable_declaration = previous;
+        }
         fn visit_import_decl(&mut self, _: &ImportDecl) {}
         fn visit_ts_import_equals_decl(&mut self, import: &TsImportEqualsDecl) {
             if import.is_export {
@@ -357,6 +364,11 @@ pub fn live_bindings(program: &Program, bindings: &HashSet<Id>) -> HashSet<Id> {
             if let Pat::Ident(id) = &decl.name
                 && self.bindings.contains(&id.to_id())
             {
+                // Loop headers and other retained declarations must keep their
+                // initializer dependencies, even when the declared name is dead.
+                if !self.prunable_declaration {
+                    self.live.insert(id.to_id());
+                }
                 let previous = self.owner.replace(id.to_id());
                 decl.init.visit_with(self);
                 self.owner = previous;
@@ -395,6 +407,7 @@ pub fn live_bindings(program: &Program, bindings: &HashSet<Id>) -> HashSet<Id> {
         live: HashSet::new(),
         dependencies: HashMap::new(),
         owner: None,
+        prunable_declaration: false,
     };
     program.visit_with(&mut usage);
     let mut queue: VecDeque<_> = usage.live.iter().cloned().collect();

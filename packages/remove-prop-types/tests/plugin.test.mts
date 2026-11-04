@@ -271,3 +271,22 @@ test('preserves exports aliases created by assignment in both modes', () => {
     );
   }
 });
+
+test('preserves nested exports assignment values', () => {
+  for (const options of [{}, { removeValidators: true }]) {
+    assert.deepEqual(
+      evaluate('const target = (module.exports = {}); target.propTypes = { field: 42 };', options)
+        .value,
+      { propTypes: { field: 42 } },
+    );
+  }
+});
+
+test('loop-header aliases retain their dependencies', () => {
+  assert.deepEqual(
+    evaluate(
+      "const PT = require('prop-types'); for (let alias = PT; false;) {} exports.done = true;",
+    ).value,
+    { done: true },
+  );
+});

@@ -68,6 +68,17 @@ struct RuntimeMetadata {
     found: bool,
 }
 impl Visit for RuntimeMetadata {
+    fn visit_expr(&mut self, expr: &Expr) {
+        // An exports object used as a value can escape through any expression,
+        // including conditionals, calls, and nested assignments. Visit once with
+        // member/assignment targets handled separately below.
+        if exports_target(expr, self.unresolved)
+            || matches!(unwrapped(expr), Expr::Member(member) if exports_target(&member.obj, self.unresolved))
+        {
+            self.found = true;
+        }
+        expr.visit_children_with(self);
+    }
     fn visit_prop(&mut self, prop: &Prop) {
         if matches!(prop, Prop::Shorthand(id) if id.sym == "propTypes")
             || matches!(prop, Prop::KeyValue(value) if property_name(&value.key) == Some("propTypes"))
@@ -90,9 +101,16 @@ impl Visit for RuntimeMetadata {
         if member_name(member) == Some("propTypes") {
             self.found = true;
         }
-        member.visit_children_with(self);
+        if !exports_target(&member.obj, self.unresolved) {
+            member.obj.visit_with(self);
+        }
+        member.prop.visit_with(self);
     }
     fn visit_assign_expr(&mut self, assignment: &AssignExpr) {
+        if matches!(&assignment.left, AssignTarget::Simple(SimpleAssignTarget::Member(member)) if member_name(member) == Some("exports") && global(&member.obj, "module", self.unresolved))
+        {
+            self.found = true;
+        }
         if exports_target(&assignment.right, self.unresolved) {
             self.found = true;
         }
