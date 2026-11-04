@@ -74,6 +74,19 @@ the options struct, run `pnpm types:generate` and commit the generated declarati
 Rust tests and CI verify that the declaration is up to date; edit the Rust source
 instead of editing the generated file directly.
 
+## Automatic Claude reviews
+
+The [Claude Code Review workflow](.github/workflows/claude-code-review.yml) runs
+on non-draft PRs from branches in this repository, excluding Dependabot runs.
+It cancels older runs when a PR is updated and verifies that Claude published a
+report for the reviewed head and workflow run. The job is not a required merge check.
+
+Maintainers must give the [Claude GitHub app](https://github.com/apps/claude)
+access to this repository and provide the `CLAUDE_CODE_OAUTH_TOKEN` Actions
+secret, either directly or through an organization secret shared with this repo.
+See the [Claude action setup guide](https://github.com/anthropics/claude-code-action/blob/main/docs/setup.md).
+Fork PRs are skipped because their workflows cannot access the credential.
+
 ## Splitting changes into PRs
 
 Split substantial changes into logical, independently reviewable PRs. Use
