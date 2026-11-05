@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { TraceMap, originalPositionFor } from '@jridgewell/trace-mapping';
-import earliest from 'rspack-earliest';
-import latest from 'rspack-latest';
+import { rspackHosts, runCompiler, type RspackConfiguration } from '@swc-plugins/test-utils/rspack';
+import { temporaryDirectory } from '@swc-plugins/test-utils/temp-dir';
 
 const plugin = fileURLToPath(new URL('../plugin.wasm', import.meta.url));
 const fixture = `
@@ -17,10 +16,9 @@ Component.propTypes = { field: PT.string, nested: PT.shape({ value: PT.number })
 export const marker = new Error('retained_marker');
 `;
 
-for (const endpoint of ['earliest', 'latest'] as const) {
+for (const { name: endpoint, createCompiler } of rspackHosts) {
   test(`one Wasm artifact works on the ${endpoint} supported Rspack`, async (t) => {
-    const directory = await mkdtemp(path.join(tmpdir(), 'swc-plugin-test-'));
-    t.after(() => rm(directory, { recursive: true, force: true }));
+    const directory = temporaryDirectory(t, 'prop-types-rspack-');
     await writeFile(path.join(directory, 'entry.ts'), fixture);
     const config = {
       context: directory,
@@ -50,23 +48,8 @@ for (const endpoint of ['earliest', 'latest'] as const) {
           },
         ],
       },
-    } satisfies import('rspack-earliest').Configuration & import('rspack-latest').Configuration;
-    const compiler = endpoint === 'earliest' ? earliest.rspack(config) : latest.rspack(config);
-    await new Promise<void>((resolve, reject) => {
-      compiler.run((error, stats) => {
-        compiler.close((closeError) => {
-          if (error || closeError) {
-            reject(error || closeError);
-          } else if (!stats) {
-            reject(new Error('Rspack did not return build statistics'));
-          } else if (stats.hasErrors()) {
-            reject(new Error(stats.toString({ all: false, errors: true })));
-          } else {
-            resolve();
-          }
-        });
-      });
-    });
+    } satisfies RspackConfiguration;
+    await runCompiler(createCompiler(config));
     const code = await readFile(path.join(directory, 'dist/bundle.cjs'), 'utf8');
     const module = { exports: {} as Record<string, unknown> };
     vm.runInNewContext(code, {

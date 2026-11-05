@@ -12,6 +12,9 @@
     "paths": {
       "swc-plugin-transform-invariant-warning/source-filter": [
         "./packages/transform-invariant-warning/src/source-filter.mts"
+      ],
+      "swc-plugin-remove-prop-types/source-filter": [
+        "./packages/remove-prop-types/src/source-filter.mts"
       ]
     }
   },

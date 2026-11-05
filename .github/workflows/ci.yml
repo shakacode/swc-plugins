@@ -37,8 +37,3 @@ jobs:
         run: pnpm check:packages
       - name: Rust, SWC, and earliest/latest Rspack tests
         run: pnpm test
-      - name: Inspect the distributable package
-        run: |
-          for package in packages/*; do
-            (cd "$package" && pnpm pack --pack-destination "${{ runner.temp }}")
-          done

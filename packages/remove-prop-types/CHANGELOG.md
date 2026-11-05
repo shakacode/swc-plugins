@@ -7,8 +7,6 @@ and [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Remove React propTypes definitions with automatic unused dependency pruning.
-- Preserve runtime metadata reads and exported propTypes dictionaries without package-specific exceptions.
-- Support optional standalone validator stripping and exact additional validator-library names.
+- Initial release.
 
 [Unreleased]: https://github.com/shakacode/swc-plugins/commits/main/
