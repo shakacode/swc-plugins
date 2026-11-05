@@ -19,7 +19,7 @@ importers:
         version: 0.3.31
       '@swc-plugins/test-utils':
         specifier: workspace:*
-        version: link:internal/test-utils
+        version: link:internal-packages/test-utils
       '@swc/core':
         specifier: 1.16.21
         version: 1.16.21
@@ -48,7 +48,7 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
-  internal/test-utils:
+  internal-packages/test-utils:
     dependencies:
       rspack-earliest:
         specifier: npm:@rspack/core@2.2.0
@@ -61,7 +61,7 @@ importers:
     devDependencies:
       '@swc-plugins/test-utils':
         specifier: workspace:*
-        version: link:../../internal/test-utils
+        version: link:../../internal-packages/test-utils
 
 packages:
 
