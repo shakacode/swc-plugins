@@ -126,6 +126,12 @@ Zero-argument invariants and invariants with a spread as their first argument
 remain unchanged. Optional warning calls are removed; optional invariant calls
 remain unchanged to preserve their conditional evaluation.
 
+Destructured `require` bindings are not transformed.
+
+Unresolved global calls, local functions, parameters, shadowed imports, type-only
+imports, unrelated imports, and shadowed `require` functions are preserved.
+Bindings with detected reassignments are conservatively left unchanged throughout the file.
+
 ## Default sources
 
 | Package                                                         | Warning sources                           | Invariant sources                             |
@@ -147,11 +153,6 @@ import { warning as warn, invariant as assert } from 'hey-listen';
 
 A source may appear in both lists. Its named exports remain unambiguous; its
 default export, direct `require`, and import-equals bindings are left unchanged.
-Destructured `require` bindings are not transformed.
-
-Unresolved global calls, local functions, parameters, shadowed imports, type-only
-imports, unrelated imports, and shadowed `require` functions are preserved.
-Bindings with detected reassignments are conservatively left unchanged throughout the file.
 
 ## Options
 
