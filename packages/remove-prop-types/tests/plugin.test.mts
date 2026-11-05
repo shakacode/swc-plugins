@@ -556,3 +556,41 @@ test('interop wrapper calls remain intact even when their result is unused', () 
     { value: { done: true }, loads: ['@swc/helpers/_/_interop_require_default', 'prop-types'] },
   );
 });
+
+for (const definition of [
+  'C.propTypes = receiver.method',
+  "Object.defineProperty(receiver.method, 'propTypes', {})",
+]) {
+  for (const use of [`(${definition})()`, `(${definition})?.()`, `(${definition})\`text\``]) {
+    test(`retained function values stay unbound and are read once: ${use}`, () => {
+      assert.deepEqual(
+        evaluate(
+          `const C = {}; let reads = 0; const receiver = { get method() { reads++; return function() { return this === receiver; }; } }; exports.value = ${use}; exports.reads = reads;`,
+        ),
+        { value: { value: false, reads: 1 }, loads: [] },
+      );
+    });
+  }
+}
+
+for (const definition of [
+  'C.propTypes = absentName',
+  "Object.defineProperty(absentName, 'propTypes', {})",
+]) {
+  test(`typeof still evaluates an unresolved retained value: ${definition}`, () => {
+    assert.throws(() => evaluate(`const C = {}; exports.value = typeof (${definition});`), {
+      name: 'ReferenceError',
+    });
+  });
+}
+
+for (const definition of ['C.propTypes = eval', "Object.defineProperty(eval, 'propTypes', {})"]) {
+  test(`retained eval values stay indirect: ${definition}`, () => {
+    assert.deepEqual(
+      evaluate(
+        `const C = {}; function run() { const local = 42; return (${definition})('typeof local'); } exports.value = run();`,
+      ),
+      { value: { value: 'undefined' }, loads: [] },
+    );
+  });
+}

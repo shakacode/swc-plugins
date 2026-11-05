@@ -5,7 +5,7 @@ use bindings::{Bindings, expression_member, live_bindings, member_name, text, un
 use config::Config;
 use std::collections::HashSet;
 use swc_core::{
-    common::{Mark, SyntaxContext, util::take::Take},
+    common::{DUMMY_SP, Mark, Span, SyntaxContext, util::take::Take},
     ecma::{
         ast::*,
         visit::{Visit, VisitMut, VisitMutWith, VisitWith},
@@ -241,6 +241,27 @@ impl Rewriter {
     }
 }
 
+fn retained_value(expr: Box<Expr>, span: Span) -> Expr {
+    // Assignment and call results are values, not call/typeof references.
+    if matches!(unwrapped(&expr), Expr::Ident(_) | Expr::SuperProp(_))
+        || expression_member(&expr).is_some()
+    {
+        Expr::Seq(SeqExpr {
+            span,
+            exprs: vec![
+                Box::new(Expr::Lit(Lit::Num(Number {
+                    span: DUMMY_SP,
+                    value: 0.0,
+                    raw: None,
+                }))),
+                expr,
+            ],
+        })
+    } else {
+        *expr
+    }
+}
+
 impl VisitMut for Rewriter {
     fn visit_mut_stmt(&mut self, statement: &mut Stmt) {
         if let Stmt::Expr(expr) = statement {
@@ -263,7 +284,7 @@ impl VisitMut for Rewriter {
     fn visit_mut_expr(&mut self, expr: &mut Expr) {
         if let Expr::Assign(assignment) = expr {
             if self.removable_assignment(assignment) {
-                *expr = *assignment.right.take();
+                *expr = retained_value(assignment.right.take(), assignment.span);
                 expr.visit_mut_with(self);
                 return;
             }
@@ -278,7 +299,7 @@ impl VisitMut for Rewriter {
         if let Expr::Call(call) = expr
             && self.removable_call(call)
         {
-            *expr = *call.args[0].expr.take();
+            *expr = retained_value(call.args[0].expr.take(), call.span);
             expr.visit_mut_with(self);
             return;
         }
