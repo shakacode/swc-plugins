@@ -33,6 +33,8 @@ jobs:
       - run: pnpm lint
       - name: Build the shared Wasm artifact
         run: pnpm build
+      - name: Check package exports and declarations
+        run: pnpm check:packages
       - name: Rust, SWC, and earliest/latest Rspack tests
         run: pnpm test
       - name: Inspect the distributable package

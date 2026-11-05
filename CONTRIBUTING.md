@@ -7,14 +7,21 @@ and pnpm from `package.json`.
 corepack enable
 pnpm install --frozen-lockfile
 pnpm build
+pnpm check:packages
 pnpm test
 pnpm typecheck
 pnpm lint
 pnpm format:check
 ```
 
-`pnpm build` compiles the Wasm plugin and copies it into its npm package.
+`pnpm build` compiles the Wasm plugin, copies it into its npm package, and
+compiles the TypeScript host helpers and their declarations.
 Build before running JavaScript tests.
+
+`pnpm check:packages` packs each npm package once and runs Publint and
+Are the Types Wrong? against its published exports and declarations. Wasm roots
+are excluded from JavaScript type analysis; packed runtime tests cover Node's
+ESM/CommonJS interop.
 
 The integration suite uses the same
 artifact with standalone SWC and the earliest and latest supported Rspack releases
@@ -69,8 +76,9 @@ it was validated; include relevant documentation links.
 
 Write changelog entries for users separately from PR titles.
 
-Plugin option declarations are generated from Rust with `ts-rs`. After changing
-the options struct, run `pnpm types:generate` and commit the generated declaration.
+Plugin option declarations are generated from Rust with `ts-rs`. Default source
+lists for host helpers are generated from the same Rust options. After changing
+the options struct or defaults, run `pnpm types:generate` and commit the generated files.
 Rust tests and CI verify that the declaration is up to date; edit the Rust source
 instead of editing the generated file directly.
 

@@ -3,10 +3,13 @@
     "target": "ES2022",
     "module": "NodeNext",
     "strict": true,
-    "noEmit": true,
     "erasableSyntaxOnly": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": ["node"],
+    "resolveJsonModule": true,
+    "declaration": true,
+    "rootDir": "src",
+    "outDir": "dist"
   },
-  "include": ["tests/**/*.mts"]
+  "include": ["src/**/*.mts", "src/**/*.json"]
 }

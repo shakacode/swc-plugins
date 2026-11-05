@@ -67,6 +67,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm build
+      - name: Check package exports and declarations
+        run: pnpm check:packages
       - run: pnpm test
       - name: Publish tagged package and GitHub release
         run: node scripts/release.mts --publish "$RELEASE_TAG"

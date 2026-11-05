@@ -83,6 +83,74 @@ Use this configuration only for production builds:
 pnpm exec swc src --out-dir dist --config-file .swcrc.production.json
 ```
 
+## Optional source filter
+
+Use the helper to skip the plugin for files without supported imports or requires.
+It accepts the [same options](#options) as the plugin.
+
+This production Rspack CLI example processes source files directly. Run it with
+`rspack build` or `rspack build --watch`; `--watch` keeps the plugin enabled
+for all files:
+
+```ts
+import { createRequire } from 'node:module';
+import type { Configuration, SwcLoaderOptions } from '@rspack/core';
+import { createSourceFilter } from 'swc-plugin-transform-invariant-warning/source-filter';
+
+const require = createRequire(import.meta.url);
+
+export default (_env: unknown, argv: { watch?: boolean }) => {
+  const watch = Boolean(argv.watch);
+  const filter = createSourceFilter();
+  const plain: SwcLoaderOptions = {
+    jsc: { parser: { syntax: 'typescript', tsx: true } },
+  };
+  const transformed: SwcLoaderOptions = {
+    ...plain,
+    jsc: {
+      ...plain.jsc,
+      experimental: {
+        plugins: [[require.resolve('swc-plugin-transform-invariant-warning'), filter.options]],
+      },
+    },
+  };
+  return {
+    mode: 'production',
+    watch,
+    module: {
+      rules: [
+        {
+          test: /\.[cm]?[jt]sx?$/,
+          oneOf: [
+            {
+              resource: (resource) => filter.testFile(resource, { watch, allowSkipping: true }),
+              use: [{ loader: 'builtin:swc-loader', options: transformed }],
+            },
+            { use: [{ loader: 'builtin:swc-loader', options: plain }] },
+          ],
+        },
+      ],
+    },
+  } satisfies Configuration;
+};
+```
+
+Pass `filter.options` to the plugin without modifying them, as shown above.
+`filter.testFile` returns
+`true` when the plugin may be needed. Read failures keep the plugin enabled.
+
+Skipping requires `watch: false` and `allowSkipping: true`. When using Rspack's
+JavaScript API with `compiler.watch()`, pass `watch: true` to `filter.testFile`.
+
+Set `allowSkipping: false` if earlier loaders or transforms could introduce
+supported imports or requires. This also applies to inline loaders and other
+matching rules. Place this plugin first when combining Wasm plugins.
+
+For virtual files or a custom filesystem, supply
+`readSource: (filename: string) => string` in the file context. If your host
+already has the actual compiler input, use `filter.test(source)` directly;
+`false` means it can skip the plugin.
+
 ## Rewrites
 
 ```js

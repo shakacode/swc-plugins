@@ -11,3 +11,5 @@
 /test-output/
 *.tgz
 .swc/
+
+/packages/*/dist/
