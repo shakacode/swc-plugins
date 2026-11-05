@@ -239,8 +239,42 @@ fn validator_factory(name: &str) -> Option<bool> {
     }
 }
 
+fn final_value(expr: &Expr) -> &Expr {
+    match unwrapped(expr) {
+        Expr::Seq(sequence) => sequence.exprs.last().map_or(expr, |last| final_value(last)),
+        expr => expr,
+    }
+}
+
+fn preserving_prefixes(expr: &Expr, replacement: Expr) -> Expr {
+    fn collect(expr: &Expr, prefixes: &mut Vec<Expr>) {
+        if let Expr::Seq(sequence) = unwrapped(expr) {
+            if let Some((last, leading)) = sequence.exprs.split_last() {
+                prefixes.extend(leading.iter().map(|expr| expr.as_ref().clone()));
+                collect(last, prefixes);
+            }
+        } else if let Some(member) = expression_member(expr) {
+            collect(&member.obj, prefixes);
+        } else if let Some(callee) = expression_callee(expr) {
+            collect(callee, prefixes);
+        }
+    }
+    let mut prefixes = Vec::new();
+    collect(expr, &mut prefixes);
+    if prefixes.is_empty() {
+        replacement
+    } else {
+        prefixes.push(replacement);
+        Expr::Seq(SeqExpr {
+            span: expr.span(),
+            exprs: prefixes.into_iter().map(Box::new).collect(),
+        })
+    }
+}
+
 impl Rewriter<'_> {
     fn module(&self, expr: &Expr) -> bool {
+        let expr = final_value(expr);
         if let Expr::Ident(id) = unwrapped(expr) {
             return matches!(self.bindings.kinds.get(&id.to_id()), Some(Kind::Module));
         }
@@ -249,6 +283,7 @@ impl Rewriter<'_> {
         })
     }
     fn validator(&self, expr: &Expr) -> Option<bool> {
+        let expr = final_value(expr);
         if let Expr::Ident(id) = unwrapped(expr) {
             return match self.bindings.kinds.get(&id.to_id()) {
                 Some(Kind::Validator(name)) => validator_factory(name),
@@ -263,6 +298,7 @@ impl Rewriter<'_> {
         }
     }
     fn required_validator(&self, expr: &Expr) -> bool {
+        let expr = final_value(expr);
         expression_member(expr).is_some_and(|member| {
             member_name(member) == Some("isRequired")
                 && (self.validator(&member.obj).is_some()
@@ -340,18 +376,20 @@ impl VisitMut for Rewriter<'_> {
         }
         if self.config.remove_validators {
             if self.required_validator(expr) {
-                *expr = null(expr.span());
+                *expr = preserving_prefixes(expr, null(expr.span()));
+                expr.visit_mut_children_with(self);
                 return;
             }
             if let Some(callee) = expression_callee(expr)
                 && (self.validator(callee).is_some() || self.required_validator(callee))
             {
-                *expr = undefined(expr.span());
+                *expr = preserving_prefixes(expr, undefined(expr.span()));
+                expr.visit_mut_children_with(self);
                 return;
             }
             if let Some(factory) = self.validator(expr) {
                 let span = expr.span();
-                *expr = if factory {
+                let replacement = if factory {
                     Expr::Arrow(ArrowExpr {
                         span,
                         ctxt: Default::default(),
@@ -365,6 +403,8 @@ impl VisitMut for Rewriter<'_> {
                 } else {
                     null(span)
                 };
+                *expr = preserving_prefixes(expr, replacement);
+                expr.visit_mut_children_with(self);
                 return;
             }
         }

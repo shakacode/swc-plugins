@@ -96,6 +96,9 @@ pub fn expression_callee(expr: &Expr) -> Option<&Expr> {
 }
 
 fn value_root(expr: &Expr) -> Option<&Ident> {
+    if let Expr::Seq(sequence) = unwrapped(expr) {
+        return sequence.exprs.last().and_then(|last| value_root(last));
+    }
     if let Expr::Ident(id) = unwrapped(expr) {
         return Some(id);
     }
@@ -320,6 +323,32 @@ impl Visit for Bindings<'_> {
     fn visit_var_declarator(&mut self, decl: &VarDeclarator) {
         if let Some(init) = &decl.init {
             let required_source = self.required(init);
+            if !matches!(decl.name, Pat::Ident(_)) {
+                #[derive(Default)]
+                struct BoundNames(HashSet<Id>);
+                impl Visit for BoundNames {
+                    fn visit_binding_ident(&mut self, id: &BindingIdent) {
+                        self.0.insert(id.to_id());
+                    }
+                }
+                let mut names = BoundNames::default();
+                decl.name.visit_with(&mut names);
+                if let Some(source) = &required_source {
+                    for id in names.0 {
+                        self.sources.insert(id, source.clone());
+                    }
+                } else if let Some(first) = names.0.iter().next().cloned() {
+                    // Connect the pattern through one binding to avoid a complete
+                    // graph between initializer references and declared names.
+                    let mut references = Identifiers::default();
+                    init.visit_with(&mut references);
+                    for source in references.0 {
+                        self.derived.entry(source).or_default().push(first.clone());
+                    }
+                    self.derived.entry(first).or_default().extend(names.0);
+                }
+            }
+
             match &decl.name {
                 Pat::Ident(id) if required_source.is_some() => {
                     self.kinds.insert(id.to_id(), Kind::Module);

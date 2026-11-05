@@ -492,3 +492,63 @@ test('named metadata function and class exports retain validator values', () => 
     { value: { value: 'required' }, loads: ['prop-types'] },
   );
 });
+
+for (const pattern of [
+  '{ string: validate } = PT',
+  '{ string: validate = missing() } = PT',
+  '{ nested: { string: validate } } = { nested: PT }',
+  '[validate] = [PT.string]',
+]) {
+  test(`destructured aliases retain mutation protection: ${pattern}`, () => {
+    assert.deepEqual(
+      evaluate(
+        `const PT = require('prop-types'); const ${pattern}; validate.custom = 42; exports.value = PT.string.custom;`,
+        { removeValidators: true },
+      ),
+      { value: { value: 42 }, loads: ['prop-types'] },
+    );
+  });
+}
+
+for (const expression of [
+  '(0, PT.shape)(missing())',
+  '(0, PT.shape)?.(missing())',
+  '(0, PT.shape)(missing()).isRequired',
+  '(0, (0, PT.shape))(missing())',
+  '(0, PT.string)(missing())',
+]) {
+  test(`aggressive unbound validator calls drop arguments: ${expression}`, () => {
+    const result = evaluate(`const PT = require('prop-types'); exports.value = ${expression};`, {
+      removeValidators: true,
+    });
+    assert.deepEqual(result.loads, []);
+    assert.ok(result.value.value === null || result.value.value === undefined);
+  });
+}
+
+for (const expression of [
+  '(++count, PT.shape)(missing())',
+  '(++count, PT.shape)?.(missing())',
+  '(++count, PT.shape)(missing()).isRequired',
+  '(++count, PT).shape(missing())',
+  '(++count, PT.string)',
+  '(++count, PT.string).isRequired',
+]) {
+  test(`aggressive sequence expressions retain callee effects: ${expression}`, () => {
+    const result = evaluate(
+      `const PT = require('prop-types'); let count = 0; const discarded = ${expression}; exports.count = count;`,
+      { removeValidators: true },
+    );
+    assert.deepEqual(result, { value: { count: 1 }, loads: [] });
+  });
+}
+
+test('unbound validator aliases retain mutation protection', () => {
+  assert.deepEqual(
+    evaluate(
+      "const PT = require('prop-types'); const validate = (0, PT.string); validate.custom = 42; exports.value = PT.string.custom;",
+      { removeValidators: true },
+    ),
+    { value: { value: 42 }, loads: ['prop-types'] },
+  );
+});
