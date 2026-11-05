@@ -242,24 +242,18 @@ impl Rewriter {
 }
 
 fn retained_value(expr: Box<Expr>, span: Span) -> Expr {
-    // Assignment and call results are values, not call/typeof references.
-    if matches!(unwrapped(&expr), Expr::Ident(_) | Expr::SuperProp(_))
-        || expression_member(&expr).is_some()
-    {
-        Expr::Seq(SeqExpr {
-            span,
-            exprs: vec![
-                Box::new(Expr::Lit(Lit::Num(Number {
-                    span: DUMMY_SP,
-                    value: 0.0,
-                    raw: None,
-                }))),
-                expr,
-            ],
-        })
-    } else {
-        *expr
-    }
+    // Preserve a value boundary: references stay unbound and anonymous values stay unnamed.
+    Expr::Seq(SeqExpr {
+        span,
+        exprs: vec![
+            Box::new(Expr::Lit(Lit::Num(Number {
+                span: DUMMY_SP,
+                value: 0.0,
+                raw: None,
+            }))),
+            expr,
+        ],
+    })
 }
 
 impl VisitMut for Rewriter {

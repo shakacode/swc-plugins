@@ -594,3 +594,19 @@ for (const definition of ['C.propTypes = eval', "Object.defineProperty(eval, 'pr
     );
   });
 }
+
+for (const expression of ['() => {}', 'function() {}', 'class { static label = this.name; }']) {
+  for (const definition of [
+    `C.propTypes = ${expression}`,
+    `Object.defineProperty(${expression}, 'propTypes', {})`,
+  ]) {
+    test(`retained anonymous values do not acquire initializer names: ${definition}`, () => {
+      assert.deepEqual(
+        evaluate(
+          `const C = {}; const value = ${definition}; exports.name = value.name; exports.label = value.label ?? '';`,
+        ),
+        { value: { name: '', label: '' }, loads: [] },
+      );
+    });
+  }
+}
