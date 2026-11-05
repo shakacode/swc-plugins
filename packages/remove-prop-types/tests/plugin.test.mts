@@ -552,3 +552,47 @@ test('unbound validator aliases retain mutation protection', () => {
     { value: { value: 42 }, loads: ['prop-types'] },
   );
 });
+
+for (const pattern of [
+  '{ validate = PT.string } = {}',
+  '[validate = PT.string] = []',
+  '{ nested: { validate = PT.string } } = { nested: {} }',
+]) {
+  test(`destructuring default aliases retain mutation protection: ${pattern}`, () => {
+    assert.deepEqual(
+      evaluate(
+        `const PT = require('prop-types'); const ${pattern}; validate.custom = 42; exports.value = validate.custom;`,
+        { removeValidators: true },
+      ),
+      { value: { value: 42 }, loads: ['prop-types'] },
+    );
+  });
+}
+
+for (const options of [{}, { removeValidators: true }]) {
+  for (const property of ['.propTypes', "['propTypes']"]) {
+    test(`super metadata reads preserve definitions: ${property} ${JSON.stringify(options)}`, () => {
+      assert.deepEqual(
+        evaluate(
+          `class Base { static propTypes = { field: 42 }; } class Child extends Base { static schema() { return super${property}; } } exports.keys = Object.keys(Child.schema());`,
+          options,
+        ),
+        { value: { keys: ['field'] }, loads: [] },
+      );
+    });
+  }
+}
+
+for (const expression of [
+  '(++count, PT.shape({})).isRequired',
+  '(++count, PT.shape({}))?.isRequired',
+  '(++count, PT.shape({})).isRequired?.(missing())',
+]) {
+  test(`sequence-wrapped factory results keep required chains valid: ${expression}`, () => {
+    const result = evaluate(
+      `const PT = require('prop-types'); let count = 0; const discarded = ${expression}; exports.count = count;`,
+      { removeValidators: true },
+    );
+    assert.deepEqual(result, { value: { count: 1 }, loads: [] });
+  });
+}

@@ -334,17 +334,25 @@ impl Visit for Bindings<'_> {
                 let mut names = BoundNames::default();
                 decl.name.visit_with(&mut names);
                 if let Some(source) = &required_source {
-                    for id in names.0 {
-                        self.sources.insert(id, source.clone());
+                    for id in &names.0 {
+                        self.sources.insert(id.clone(), source.clone());
                     }
-                } else if let Some(first) = names.0.iter().next().cloned() {
+                }
+                if let Some(first) = names.0.iter().next().cloned() {
                     // Connect the pattern through one binding to avoid a complete
                     // graph between initializer references and declared names.
                     let mut references = Identifiers::default();
-                    init.visit_with(&mut references);
-                    for source in references.0 {
-                        self.derived.entry(source).or_default().push(first.clone());
+                    decl.name.visit_with(&mut references);
+                    if required_source.is_none() {
+                        init.visit_with(&mut references);
                     }
+                    for source in references.0.difference(&names.0) {
+                        self.derived
+                            .entry(source.clone())
+                            .or_default()
+                            .push(first.clone());
+                    }
+                    names.0.remove(&first);
                     self.derived.entry(first).or_default().extend(names.0);
                 }
             }

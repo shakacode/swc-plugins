@@ -127,6 +127,15 @@ impl Visit for RuntimeMetadata {
         }
         member.prop.visit_with(self);
     }
+    fn visit_super_prop_expr(&mut self, member: &SuperPropExpr) {
+        if match &member.prop {
+            SuperProp::Ident(name) => name.sym == "propTypes",
+            SuperProp::Computed(key) => text(&key.expr) == Some("propTypes"),
+        } {
+            self.found = true;
+        }
+        member.visit_children_with(self);
+    }
     fn visit_assign_expr(&mut self, assignment: &AssignExpr) {
         if matches!(&assignment.left, AssignTarget::Simple(SimpleAssignTarget::Member(member)) if member_name(member) == Some("exports") && global(&member.obj, "module", self.unresolved))
         {
@@ -302,7 +311,7 @@ impl Rewriter<'_> {
         expression_member(expr).is_some_and(|member| {
             member_name(member) == Some("isRequired")
                 && (self.validator(&member.obj).is_some()
-                    || expression_callee(&member.obj)
+                    || expression_callee(final_value(&member.obj))
                         .is_some_and(|callee| self.validator(callee).is_some()))
         })
     }
