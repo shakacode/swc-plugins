@@ -1,0 +1,16 @@
+{
+  "warningSources": [
+    "warning",
+    "tiny-warning",
+    "fbjs/lib/warning",
+    "fbjs/lib/warning.js",
+    "hey-listen"
+  ],
+  "invariantSources": [
+    "invariant",
+    "tiny-invariant",
+    "fbjs/lib/invariant",
+    "fbjs/lib/invariant.js",
+    "hey-listen"
+  ]
+}

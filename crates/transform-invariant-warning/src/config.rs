@@ -8,11 +8,11 @@ pub enum Kind {
 
 #[derive(serde::Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Serialize))]
 pub struct PluginOptions {
-    #[cfg_attr(test, ts(as = "Option<_>", optional))]
+    #[cfg_attr(test, ts(type = "ReadonlyArray<string>", optional))]
     warning_sources: Vec<String>,
-    #[cfg_attr(test, ts(as = "Option<_>", optional))]
+    #[cfg_attr(test, ts(type = "ReadonlyArray<string>", optional))]
     invariant_sources: Vec<String>,
 }
 
@@ -81,37 +81,47 @@ fn exported_options_are_current() {
         "// Generated from Rust by ts-rs. Run pnpm types:generate to update.\nexport {}\n",
         PluginOptions::decl(&ts_rs::Config::default()),
     );
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../packages/transform-invariant-warning/index.d.ts");
-    // Use the same formatter as the rest of the repository before comparing output.
-    use std::io::Write;
-    use std::process::{Command, Stdio};
-    let mut formatter = Command::new("pnpm")
-        .current_dir(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-        .args(["exec", "oxfmt", "-c", ".oxfmtrc.jsonc", "--stdin-filepath"])
-        .arg(&path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("pnpm and Oxfmt must be installed to check generated declarations");
-    formatter
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(declaration.as_bytes())
-        .unwrap();
-    let output = formatter.wait_with_output().unwrap();
-    assert!(
-        output.status.success(),
-        "Oxfmt failed to format the declaration"
+    let defaults = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&PluginOptions::default()).unwrap()
     );
-    let declaration = String::from_utf8(output.stdout).unwrap();
-    if std::env::var_os("UPDATE_BINDINGS").is_some() {
-        std::fs::write(&path, &declaration).unwrap();
+    for (filename, contents) in [
+        ("index.d.ts", declaration),
+        ("src/default-options.json", defaults),
+    ] {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../packages/transform-invariant-warning")
+            .join(filename);
+        // Format generated artifacts with the repository's formatter.
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+        let mut formatter = Command::new("pnpm")
+            .current_dir(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+            .args(["exec", "oxfmt", "-c", ".oxfmtrc.jsonc", "--stdin-filepath"])
+            .arg(&path)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("pnpm and Oxfmt must be installed to check generated artifacts");
+        formatter
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(contents.as_bytes())
+            .unwrap();
+        let output = formatter.wait_with_output().unwrap();
+        assert!(
+            output.status.success(),
+            "Oxfmt failed to format generated artifacts"
+        );
+        let contents = String::from_utf8(output.stdout).unwrap();
+        if std::env::var_os("UPDATE_BINDINGS").is_some() {
+            std::fs::write(&path, &contents).unwrap();
+        }
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap_or_default(),
+            contents,
+            "Run pnpm types:generate and commit the generated artifacts"
+        );
     }
-    assert_eq!(
-        std::fs::read_to_string(&path).unwrap_or_default(),
-        declaration,
-        "Run pnpm types:generate and commit the generated declaration"
-    );
 }

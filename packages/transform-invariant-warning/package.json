@@ -19,7 +19,8 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
-    "index.d.ts"
+    "index.d.ts",
+    "dist"
   ],
   "main": "plugin.wasm",
   "types": "index.d.ts",
@@ -27,6 +28,10 @@
     ".": {
       "types": "./index.d.ts",
       "default": "./plugin.wasm"
+    },
+    "./source-filter": {
+      "types": "./dist/source-filter.d.mts",
+      "default": "./dist/source-filter.mjs"
     }
   },
   "publishConfig": {
@@ -34,6 +39,7 @@
   },
   "scripts": {
     "test": "node --test --test-isolation=none tests/*.test.mts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build:js": "tsc -p tsconfig.json"
   }
 }
