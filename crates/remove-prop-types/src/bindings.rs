@@ -10,12 +10,6 @@ use swc_core::{
 
 use crate::config::Config;
 
-#[derive(Clone)]
-pub enum Kind {
-    Module,
-    Validator(String),
-}
-
 pub fn text(expr: &Expr) -> Option<&str> {
     match expr {
         Expr::Lit(Lit::Str(value)) => value.value.as_str(),
@@ -44,30 +38,6 @@ pub fn unwrapped(expr: &Expr) -> &Expr {
         Expr::TsInstantiation(value) => unwrapped(&value.expr),
         _ => expr,
     }
-}
-
-fn interop_argument<'a>(expr: &'a Expr, helpers: &HashSet<Id>) -> Option<&'a Expr> {
-    let Expr::Call(call) = unwrapped(expr) else {
-        return None;
-    };
-    if call.args.len() != 1 || call.args[0].spread.is_some() {
-        return None;
-    }
-    let Callee::Expr(callee) = &call.callee else {
-        return None;
-    };
-    let callee = match unwrapped(callee) {
-        Expr::Member(member) if matches!(member_name(member), Some("_" | "default")) => {
-            unwrapped(&member.obj)
-        }
-        value => value,
-    };
-    let Expr::Ident(ident) = callee else {
-        return None;
-    };
-    helpers
-        .contains(&ident.to_id())
-        .then_some(&*call.args[0].expr)
 }
 
 pub fn expression_member(expr: &Expr) -> Option<&MemberExpr> {
@@ -145,12 +115,10 @@ fn pattern_bindings<N: VisitWith<BoundNames>>(pattern: &N) -> HashSet<Id> {
 }
 
 pub struct Bindings<'a> {
-    pub kinds: HashMap<Id, Kind>,
     pub all: HashSet<Id>,
     aliases: HashMap<Id, Vec<Id>>,
     derived: HashMap<Id, Vec<Id>>,
     sources: HashMap<Id, String>,
-    interop_helpers: HashSet<Id>,
     writes: HashSet<Id>,
     declarations: HashMap<Id, usize>,
     config: &'a Config,
@@ -166,36 +134,7 @@ impl<'a> Bindings<'a> {
     }
 
     pub fn collect(program: &Program, config: &'a Config, unresolved: SyntaxContext) -> Self {
-        #[derive(Default)]
-        struct Helpers(HashSet<Id>);
-        impl Visit for Helpers {
-            fn visit_import_decl(&mut self, import: &ImportDecl) {
-                if !import.type_only
-                    && import.src.value.as_str().is_some_and(|source| {
-                        matches!(
-                            source,
-                            "@babel/runtime/helpers/interopRequireDefault"
-                                | "@babel/runtime/helpers/interopRequireWildcard"
-                                | "@babel/runtime/helpers/esm/interopRequireDefault"
-                                | "@babel/runtime/helpers/esm/interopRequireWildcard"
-                                | "@swc/helpers/_/_interop_require_default"
-                                | "@swc/helpers/_/_interop_require_wildcard"
-                        )
-                    })
-                {
-                    for specifier in &import.specifiers {
-                        if !specifier.is_type_only() {
-                            self.0.insert(specifier.local().to_id());
-                        }
-                    }
-                }
-            }
-        }
-        let mut helpers = Helpers::default();
-        program.visit_with(&mut helpers);
         let mut result = Self {
-            interop_helpers: helpers.0,
-            kinds: HashMap::new(),
             all: HashSet::new(),
             aliases: HashMap::new(),
             derived: HashMap::new(),
@@ -206,13 +145,10 @@ impl<'a> Bindings<'a> {
             unresolved,
         };
         program.visit_with(&mut result);
-        let mut queue: VecDeque<_> = result.kinds.keys().cloned().collect();
+        let mut queue: VecDeque<_> = result.all.iter().cloned().collect();
         while let Some(id) = queue.pop_front() {
             for alias in result.aliases.get(&id).into_iter().flatten() {
-                if !result.kinds.contains_key(alias) {
-                    result
-                        .kinds
-                        .insert(alias.clone(), result.kinds[&id].clone());
+                if result.all.insert(alias.clone()) {
                     queue.push_back(alias.clone());
                 }
             }
@@ -254,10 +190,9 @@ impl<'a> Bindings<'a> {
                 }
             }
         }
-        result.kinds.retain(|id, _| !result.writes.contains(id));
+        result.all.retain(|id| !result.writes.contains(id));
         // A redeclared or mutated binding is no longer a removable library
         // binding: another initializer can have unrelated application effects.
-        result.all = result.kinds.keys().cloned().collect();
         result
     }
 
@@ -279,7 +214,6 @@ impl<'a> Bindings<'a> {
     }
 
     fn required(&self, expr: &Expr) -> Option<String> {
-        let expr = interop_argument(expr, &self.interop_helpers).unwrap_or(expr);
         let Expr::Call(call) = unwrapped(expr) else {
             return None;
         };
@@ -332,22 +266,7 @@ impl Visit for Bindings<'_> {
             if specifier.is_type_only() {
                 continue;
             }
-            let kind = match specifier {
-                ImportSpecifier::Named(named) => {
-                    let name = named
-                        .imported
-                        .as_ref()
-                        .map(|name| name.atom().to_string())
-                        .unwrap_or_else(|| named.local.sym.to_string());
-                    if name == "default" {
-                        Kind::Module
-                    } else {
-                        Kind::Validator(name)
-                    }
-                }
-                _ => Kind::Module,
-            };
-            self.kinds.insert(specifier.local().to_id(), kind);
+            self.all.insert(specifier.local().to_id());
             self.sources.insert(
                 specifier.local().to_id(),
                 import.src.value.as_str().unwrap().to_owned(),
@@ -365,7 +284,7 @@ impl Visit for Bindings<'_> {
                 .as_str()
                 .is_some_and(|source| self.config.sources.contains(source))
         {
-            self.kinds.insert(import.id.to_id(), Kind::Module);
+            self.all.insert(import.id.to_id());
             self.sources.insert(
                 import.id.to_id(),
                 reference.expr.value.as_str().unwrap().to_owned(),
@@ -376,15 +295,6 @@ impl Visit for Bindings<'_> {
     fn visit_var_declarator(&mut self, decl: &VarDeclarator) {
         if let Some(init) = &decl.init {
             let required_source = self.required(init);
-            if interop_argument(init, &self.interop_helpers).is_some()
-                && let Some(helper) = value_root(init)
-            {
-                self.derived
-                    .entry(helper.to_id())
-                    .or_default()
-                    .extend(pattern_bindings(&decl.name));
-            }
-
             if !matches!(decl.name, Pat::Ident(_)) {
                 let names = pattern_bindings(&decl.name);
                 if let Some(source) = &required_source {
@@ -398,14 +308,12 @@ impl Visit for Bindings<'_> {
 
             match &decl.name {
                 Pat::Ident(id) if required_source.is_some() => {
-                    self.kinds.insert(id.to_id(), Kind::Module);
+                    self.all.insert(id.to_id());
                     self.sources
                         .insert(id.to_id(), required_source.clone().unwrap());
                 }
                 Pat::Ident(id) => {
-                    if let Expr::Ident(source) =
-                        unwrapped(interop_argument(init, &self.interop_helpers).unwrap_or(init))
-                    {
+                    if let Expr::Ident(source) = unwrapped(init) {
                         self.aliases
                             .entry(source.to_id())
                             .or_default()
@@ -421,30 +329,22 @@ impl Visit for Bindings<'_> {
                     for prop in &object.props {
                         let binding = match prop {
                             ObjectPatProp::Assign(prop) if prop.value.is_none() => {
-                                Some((prop.key.to_id(), prop.key.sym.to_string()))
+                                Some(prop.key.to_id())
                             }
-                            ObjectPatProp::KeyValue(prop) => match (&prop.key, &*prop.value) {
-                                (PropName::Ident(key), Pat::Ident(id)) => {
-                                    Some((id.to_id(), key.sym.to_string()))
+                            ObjectPatProp::KeyValue(prop)
+                                if matches!(prop.key, PropName::Ident(_) | PropName::Str(_)) =>
+                            {
+                                match &*prop.value {
+                                    Pat::Ident(id) => Some(id.to_id()),
+                                    _ => None,
                                 }
-                                (PropName::Str(key), Pat::Ident(id)) => {
-                                    key.value.as_str().map(|key| (id.to_id(), key.to_owned()))
-                                }
-                                _ => None,
-                            },
+                            }
                             _ => None,
                         };
-                        if let Some((id, name)) = binding {
+                        if let Some(id) = binding {
                             self.sources
                                 .insert(id.clone(), required_source.clone().unwrap());
-                            self.kinds.insert(
-                                id,
-                                if name == "default" {
-                                    Kind::Module
-                                } else {
-                                    Kind::Validator(name)
-                                },
-                            );
+                            self.all.insert(id);
                         }
                     }
                 }

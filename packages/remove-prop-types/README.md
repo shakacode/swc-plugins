@@ -74,7 +74,7 @@ pnpm exec swc src --out-dir dist --config-file .swcrc.production.json
 
 Use the helper to skip the plugin for files without possible `propTypes`
 definitions or configured validator libraries. It accepts the [same options](#options)
-as the plugin. Library names matter even with `removeValidators: false`, because
+as the plugin. Library names matter because
 unused imports and requires can be pruned without a definition.
 
 This production Rspack CLI example processes source files directly. Run it with
@@ -167,7 +167,7 @@ Standalone removed definitions do not evaluate their targets, descriptors, or
 validators. An assignment used as a value retains and evaluates its right-hand
 side once; an `Object.defineProperty` call used as a value retains its target.
 
-Unused bindings from exact `prop-types` imports and unshadowed `require` calls
+Unused bindings from exact `prop-types` imports and direct, unshadowed `require` calls
 are pruned, including dead alias chains. This also applies when those bindings
 were already unused before the transform.
 
@@ -177,6 +177,7 @@ for more examples.
 What remains unchanged:
 
 - Explicit side-effect imports, live runtime bindings, and type-only imports.
+- Standalone validator expressions and calls, including calls through module-interop helpers.
 - Import/require bindings from unrelated validator libraries.
 - Dynamic property names and non-static or decorated class fields.
 - Modules with detected runtime metadata use, as described below.
@@ -186,8 +187,7 @@ What remains unchanged:
 Some code enumerates or forwards properties using validator dictionaries. The
 plugin preserves the whole module when it detects a runtime `propTypes` member
 read or a named `propTypes` export, including CommonJS exports and export aliases.
-This protection also applies with `removeValidators: true`. Modules that
-explicitly modify global `Object` or `require` are preserved too.
+Conservative analysis also preserves modules that may modify global `Object` or `require`.
 
 The plugin cannot detect another module reading an exported component's
 `propTypes`, arbitrary reflection, or indirect runtime data flow. Exclude modules
@@ -202,22 +202,12 @@ arbitrary local wrappers around `Object.defineProperty` or module interop.
 import type { PluginOptions } from 'swc-plugin-remove-prop-types';
 
 const options: PluginOptions = {
-  removeValidators: false,
   additionalLibraries: [],
 };
 ```
 
-- `removeValidators` defaults to `false`. Standalone validator expressions and
-  calls remain available at runtime. Set it to `true` to replace known imported
-  validator reads with `null`, factory calls (including optional calls) with `void 0`, and factory references
-  with functions returning `null`. Validator-construction arguments are dropped.
-  This disables standalone validation; unknown members such as `checkPropTypes`
-  remain unchanged. Detected mutations and redeclarations prevent substitution
-  or pruning through the affected binding, its direct aliases, and other imports
-  of the same exact library source.
 - `additionalLibraries` adds exact module names to `prop-types`. It does not
-  match prefixes, subpaths, or regular expressions. Validator substitution
-  recognizes the standard validator names on these libraries.
+  match prefixes, subpaths, or regular expressions.
 
 Unknown or malformed options report an error. There is no `removeImport` option;
 runtime usage determines which bindings remain.

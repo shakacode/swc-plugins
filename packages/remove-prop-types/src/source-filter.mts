@@ -27,17 +27,11 @@ export function createSourceFilter(options: PluginOptions = {}): SourceFilter {
     throw new TypeError('Plugin options must be an object');
   }
   for (const key of Object.keys(parsed)) {
-    if (key !== 'removeValidators' && key !== 'additionalLibraries') {
+    if (key !== 'additionalLibraries') {
       throw new TypeError(`Unknown plugin option: ${key}`);
     }
   }
   const record = parsed as Record<string, unknown>;
-  const removeValidators = Object.hasOwn(record, 'removeValidators')
-    ? record.removeValidators
-    : defaults.removeValidators;
-  if (typeof removeValidators !== 'boolean') {
-    throw new TypeError('removeValidators must be a boolean');
-  }
   const additionalLibraries = Object.hasOwn(record, 'additionalLibraries')
     ? record.additionalLibraries
     : defaults.additionalLibraries;
@@ -47,9 +41,9 @@ export function createSourceFilter(options: PluginOptions = {}): SourceFilter {
   ) {
     throw new TypeError('additionalLibraries must be an array of strings');
   }
-  const normalized = { removeValidators, additionalLibraries };
+  const normalized = { additionalLibraries };
   // Definitions can be removed without imports. Unused library bindings can
-  // also be pruned without definitions, even when removeValidators is false.
+  // also be pruned without definitions.
   const names = [...new Set(['propTypes', 'prop-types', ...additionalLibraries])];
   const hasMultilineSource = names.some((name) => name.includes('\n'));
   function test(source: string): boolean {

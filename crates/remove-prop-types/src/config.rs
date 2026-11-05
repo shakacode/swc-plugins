@@ -4,14 +4,11 @@ use std::collections::HashSet;
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 #[cfg_attr(test, derive(ts_rs::TS, serde::Serialize))]
 pub struct PluginOptions {
-    #[cfg_attr(test, ts(as = "Option<_>", optional))]
-    pub remove_validators: bool,
     #[cfg_attr(test, ts(type = "ReadonlyArray<string>", optional))]
     pub additional_libraries: Vec<String>,
 }
 
 pub struct Config {
-    pub remove_validators: bool,
     pub sources: HashSet<String>,
 }
 
@@ -23,10 +20,7 @@ impl Config {
         deserializer.end().map_err(|error| error.to_string())?;
         let mut sources: HashSet<_> = options.additional_libraries.into_iter().collect();
         sources.insert("prop-types".into());
-        Ok(Self {
-            remove_validators: options.remove_validators,
-            sources,
-        })
+        Ok(Self { sources })
     }
 }
 

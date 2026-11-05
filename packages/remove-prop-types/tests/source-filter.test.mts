@@ -31,7 +31,6 @@ test('keeps definitions and validator imports eligible independently', () => {
 
 test('additional libraries extend eligibility without replacing built-in matching', () => {
   const filter = createSourceFilter({ additionalLibraries: ['custom/validators'] });
-  assert.equal(filter.options.removeValidators, false);
   assert.equal(
     filter.test("const PT = require('custom/validators'); export const value = 1;"),
     true,
@@ -53,18 +52,16 @@ test('retains escaped names and cooked static-template line endings', () => {
 });
 
 test('normalizes defaults and snapshots caller options once', () => {
-  const options = { removeValidators: true, additionalLibraries: ['custom/validators'] };
+  const options = { additionalLibraries: ['custom/validators'] };
   const filter = createSourceFilter(options);
-  options.removeValidators = false;
   options.additionalLibraries[0] = 'changed';
   assert.deepEqual(filter.options, {
-    removeValidators: true,
     additionalLibraries: ['custom/validators'],
   });
   assert.equal(filter.test('custom/validators'), true);
   assert.equal(filter.test('changed'), false);
   assert.deepEqual(
-    createSourceFilter({ removeValidators: undefined }).options,
+    createSourceFilter({ additionalLibraries: undefined }).options,
     createSourceFilter().options,
   );
 });
@@ -74,8 +71,6 @@ test('rejects invalid options before any file can bypass the guest', () => {
     null,
     [],
     { unknown: true },
-    { removeValidators: null },
-    { removeValidators: 1 },
     { additionalLibraries: null },
     { additionalLibraries: 'custom' },
     { additionalLibraries: [42] },
@@ -143,12 +138,12 @@ const fixtures: { name: string; source: string; options?: PluginOptions }[] = [
   {
     name: 'standalone validator',
     source: "const PT = require('custom/validators'); export const value = PT.string;",
-    options: { removeValidators: true, additionalLibraries: ['custom/validators'] },
+    options: { additionalLibraries: ['custom/validators'] },
   },
   {
     name: 'CRLF template source',
     source: 'const PT = require(`custom\r\nvalidators`); export const value = PT.string;',
-    options: { removeValidators: true, additionalLibraries: ['custom\nvalidators'] },
+    options: { additionalLibraries: ['custom\nvalidators'] },
   },
   {
     name: 'CR template source',

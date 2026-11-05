@@ -46,7 +46,7 @@ fn removes_definitions_without_evaluating_them() {
 #[test]
 fn validates_options_even_for_preserved_modules() {
     for options in [
-        r#"{"removeValidators":"yes"}"#,
+        r#"{"additionalLibraries":false}"#,
         r#"{"additionalLibraries":42}"#,
         r#"{"removeImport":true}"#,
         r#"{} trailing"#,
@@ -63,7 +63,7 @@ fn removes_static_and_define_property_definitions() {
 }
 
 #[test]
-fn keeps_runtime_metadata_and_exported_dictionaries_in_both_modes() {
+fn keeps_runtime_metadata_and_exported_dictionaries() {
     for source in [
         "const Component = {}; Component.propTypes = { field: validate }; use(Object.keys(Component.propTypes));",
         "export const propTypes = { field: validate };",
@@ -75,11 +75,9 @@ fn keeps_runtime_metadata_and_exported_dictionaries_in_both_modes() {
         "const target = exports; target.propTypes = { field: validate };",
         "Object.defineProperty(exports, 'propTypes', { value: validate });",
     ] {
-        for options in ["{}", r#"{"removeValidators":true}"#] {
-            let code = rewrite(source, options).unwrap();
-            assert!(code.contains("validate"), "{source}: {code}");
-            assert!(code.contains("propTypes"), "{source}: {code}");
-        }
+        let code = rewrite(source, "{}").unwrap();
+        assert!(code.contains("validate"), "{source}: {code}");
+        assert!(code.contains("propTypes"), "{source}: {code}");
     }
 }
 
@@ -92,29 +90,26 @@ fn unused_imports_are_pruned_but_runtime_and_side_effect_imports_remain() {
 }
 
 #[test]
-fn standalone_validators_are_preserved_by_default() {
+fn standalone_validators_are_preserved() {
     let source = "import PT from 'prop-types'; export const validate = PT.string.isRequired;";
     assert!(
         rewrite(source, "{}")
             .unwrap()
             .contains("PT.string.isRequired")
     );
-    let code = rewrite(source, r#"{"removeValidators":true}"#).unwrap();
-    assert!(code.contains("validate = null"), "{code}");
-    assert!(!code.contains("prop-types"), "{code}");
 }
 
 #[test]
 fn exact_source_matching_and_shadowing_are_preserved() {
-    let code = rewrite("import PT from 'prop-types/extra'; const value = PT.string; function read(PT) { return PT.string; }", r#"{"removeValidators":true}"#).unwrap();
+    let code = rewrite("import PT from 'prop-types/extra'; const value = PT.string; function read(PT) { return PT.string; }", "{}").unwrap();
     assert!(code.contains("value = PT.string"), "{code}");
     assert!(code.contains("return PT.string"), "{code}");
     let code = rewrite(
         "import PT from 'custom-validators'; export const value = PT.string;",
-        r#"{"removeValidators":true,"additionalLibraries":["custom-validators"]}"#,
+        r#"{"additionalLibraries":["custom-validators"]}"#,
     )
     .unwrap();
-    assert!(code.contains("value = null"), "{code}");
+    assert!(code.contains("value = PT.string"), "{code}");
 }
 
 #[test]
@@ -133,7 +128,7 @@ fn reassigned_bindings_and_aliases_are_not_neutralized() {
         "let PT = require('prop-types'); const alias = PT; PT.string = runtime; exports.value = alias.string;",
         "import PT from 'prop-types'; PT.string = runtime; exports.value = PT.string;",
     ] {
-        let code = rewrite(source, r#"{"removeValidators":true}"#).unwrap();
+        let code = rewrite(source, "{}").unwrap();
         assert!(code.contains(".string"), "{code}");
         assert!(code.contains("runtime"), "{code}");
     }
@@ -165,28 +160,28 @@ fn exported_import_equals_and_type_only_imports_remain() {
 
 #[test]
 fn unknown_interop_helpers_remain_runtime_calls() {
-    let code = rewrite("function _interopRequireDefault(value) { return runtime; } const PT = _interopRequireDefault(require('prop-types')); exports.value = PT.string;", r#"{"removeValidators":true}"#).unwrap();
+    let code = rewrite("function _interopRequireDefault(value) { return runtime; } const PT = _interopRequireDefault(require('prop-types')); exports.value = PT.string;", "{}").unwrap();
     assert!(code.contains("PT.string"), "{code}");
     assert!(code.contains("_interopRequireDefault(require"), "{code}");
 }
 
 #[test]
-fn optional_validator_construction_drops_arguments_and_required_chains() {
+fn optional_validator_construction_preserves_arguments_and_required_chains() {
     for expression in [
         "PT.shape?.(missing())",
         "PT?.shape(missing()).isRequired",
         "(PT.shape as Factory)?.(missing()).isRequired",
     ] {
         let source = format!("import PT from 'prop-types'; exports.value = {expression};");
-        let code = rewrite(&source, r#"{"removeValidators":true}"#).unwrap();
-        assert!(!code.contains("missing"), "{code}");
-        assert!(!code.contains("prop-types"), "{code}");
+        let code = rewrite(&source, "{}").unwrap();
+        assert!(code.contains("missing"), "{code}");
+        assert!(code.contains("prop-types"), "{code}");
     }
 }
 
 #[test]
 fn assignment_targets_with_typescript_wrappers_keep_mutated_aliases() {
-    let code = rewrite("import PT from 'prop-types'; let validate; (validate as Validator) = PT.string; validate.custom = 42; use(validate.custom);", r#"{"removeValidators":true}"#).unwrap();
+    let code = rewrite("import PT from 'prop-types'; let validate; (validate as Validator) = PT.string; validate.custom = 42; use(validate.custom);", "{}").unwrap();
     assert!(code.contains("PT.string"), "{code}");
     assert!(!code.contains("= null"), "{code}");
 }

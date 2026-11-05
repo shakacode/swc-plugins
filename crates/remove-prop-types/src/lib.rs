@@ -1,14 +1,11 @@
 mod bindings;
 mod config;
 
-use bindings::{
-    Bindings, Kind, expression_callee, expression_member, live_bindings, member_name, text,
-    unwrapped,
-};
+use bindings::{Bindings, expression_member, live_bindings, member_name, text, unwrapped};
 use config::Config;
 use std::collections::HashSet;
 use swc_core::{
-    common::{Mark, Span, Spanned, SyntaxContext, util::take::Take},
+    common::{Mark, SyntaxContext, util::take::Take},
     ecma::{
         ast::*,
         visit::{Visit, VisitMut, VisitMutWith, VisitWith},
@@ -220,101 +217,18 @@ pub fn transform(
     if bindings.globals_modified() {
         return Ok(());
     }
-    program.visit_mut_with(&mut Rewriter {
-        config: &config,
-        bindings: &bindings,
-        unresolved,
-    });
+    program.visit_mut_with(&mut Rewriter { unresolved });
     let live = live_bindings(program, &bindings.all);
     let unused = bindings.all.difference(&live).cloned().collect();
     program.visit_mut_with(&mut Pruner { unused });
     Ok(())
 }
 
-struct Rewriter<'a> {
-    config: &'a Config,
-    bindings: &'a Bindings<'a>,
+struct Rewriter {
     unresolved: SyntaxContext,
 }
 
-fn validator_factory(name: &str) -> Option<bool> {
-    match name {
-        "arrayOf" | "exact" | "instanceOf" | "objectOf" | "oneOf" | "oneOfType" | "shape" => {
-            Some(true)
-        }
-        "any" | "array" | "bigint" | "bool" | "element" | "elementType" | "func" | "node"
-        | "number" | "object" | "string" | "symbol" => Some(false),
-        _ => None,
-    }
-}
-
-fn final_value(expr: &Expr) -> &Expr {
-    match unwrapped(expr) {
-        Expr::Seq(sequence) => sequence.exprs.last().map_or(expr, |last| final_value(last)),
-        expr => expr,
-    }
-}
-
-fn preserving_prefixes(expr: &Expr, replacement: Expr) -> Expr {
-    fn collect(expr: &Expr, prefixes: &mut Vec<Expr>) {
-        if let Expr::Seq(sequence) = unwrapped(expr) {
-            if let Some((last, leading)) = sequence.exprs.split_last() {
-                prefixes.extend(leading.iter().map(|expr| expr.as_ref().clone()));
-                collect(last, prefixes);
-            }
-        } else if let Some(member) = expression_member(expr) {
-            collect(&member.obj, prefixes);
-        } else if let Some(callee) = expression_callee(expr) {
-            collect(callee, prefixes);
-        }
-    }
-    let mut prefixes = Vec::new();
-    collect(expr, &mut prefixes);
-    if prefixes.is_empty() {
-        replacement
-    } else {
-        prefixes.push(replacement);
-        Expr::Seq(SeqExpr {
-            span: expr.span(),
-            exprs: prefixes.into_iter().map(Box::new).collect(),
-        })
-    }
-}
-
-impl Rewriter<'_> {
-    fn module(&self, expr: &Expr) -> bool {
-        let expr = final_value(expr);
-        if let Expr::Ident(id) = unwrapped(expr) {
-            return matches!(self.bindings.kinds.get(&id.to_id()), Some(Kind::Module));
-        }
-        expression_member(expr).is_some_and(|member| {
-            member_name(member) == Some("default") && self.module(&member.obj)
-        })
-    }
-    fn validator(&self, expr: &Expr) -> Option<bool> {
-        let expr = final_value(expr);
-        if let Expr::Ident(id) = unwrapped(expr) {
-            return match self.bindings.kinds.get(&id.to_id()) {
-                Some(Kind::Validator(name)) => validator_factory(name),
-                _ => None,
-            };
-        }
-        let member = expression_member(expr)?;
-        if self.module(&member.obj) {
-            validator_factory(member_name(member)?)
-        } else {
-            None
-        }
-    }
-    fn required_validator(&self, expr: &Expr) -> bool {
-        let expr = final_value(expr);
-        expression_member(expr).is_some_and(|member| {
-            member_name(member) == Some("isRequired")
-                && (self.validator(&member.obj).is_some()
-                    || expression_callee(final_value(&member.obj))
-                        .is_some_and(|callee| self.validator(callee).is_some()))
-        })
-    }
+impl Rewriter {
     fn removable_assignment(&self, assignment: &AssignExpr) -> bool {
         assignment_member(assignment).is_some_and(|member| {
             member_name(member) == Some("propTypes")
@@ -327,22 +241,7 @@ impl Rewriter<'_> {
     }
 }
 
-fn null(span: Span) -> Expr {
-    Expr::Lit(Lit::Null(Null { span }))
-}
-fn undefined(span: Span) -> Expr {
-    Expr::Unary(UnaryExpr {
-        span,
-        op: UnaryOp::Void,
-        arg: Box::new(Expr::Lit(Lit::Num(Number {
-            span,
-            value: 0.0,
-            raw: None,
-        }))),
-    })
-}
-
-impl VisitMut for Rewriter<'_> {
+impl VisitMut for Rewriter {
     fn visit_mut_stmt(&mut self, statement: &mut Stmt) {
         if let Stmt::Expr(expr) = statement {
             let remove = match unwrapped(&expr.expr) {
@@ -382,40 +281,6 @@ impl VisitMut for Rewriter<'_> {
             *expr = *call.args[0].expr.take();
             expr.visit_mut_with(self);
             return;
-        }
-        if self.config.remove_validators {
-            if self.required_validator(expr) {
-                *expr = preserving_prefixes(expr, null(expr.span()));
-                expr.visit_mut_children_with(self);
-                return;
-            }
-            if let Some(callee) = expression_callee(expr)
-                && (self.validator(callee).is_some() || self.required_validator(callee))
-            {
-                *expr = preserving_prefixes(expr, undefined(expr.span()));
-                expr.visit_mut_children_with(self);
-                return;
-            }
-            if let Some(factory) = self.validator(expr) {
-                let span = expr.span();
-                let replacement = if factory {
-                    Expr::Arrow(ArrowExpr {
-                        span,
-                        ctxt: Default::default(),
-                        params: vec![],
-                        body: Box::new(ArrowFunctionBody::Expr(Box::new(null(span)))),
-                        is_async: false,
-                        is_generator: false,
-                        type_params: None,
-                        return_type: None,
-                    })
-                } else {
-                    null(span)
-                };
-                *expr = preserving_prefixes(expr, replacement);
-                expr.visit_mut_children_with(self);
-                return;
-            }
         }
         expr.visit_mut_children_with(self);
     }
