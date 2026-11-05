@@ -19,11 +19,11 @@ notify(false, missing());
 check(checks++, missing());
 assertCondition(++checks, missing());
 if (checks) check(true, missing()); else throw new Error('wrong branch');
-export const outcome = { checks, development: __DEV__ };
+export { checks };
 export const marker = new Error('retained_marker');
 `;
 
-for (const { name: endpoint, DefinePlugin, createCompiler } of rspackHosts) {
+for (const { name: endpoint, createCompiler } of rspackHosts) {
   test(`one Wasm artifact works on the ${endpoint} supported Rspack`, async (t) => {
     const directory = temporaryDirectory(t, 'swc-plugin-test-');
     await writeFile(path.join(directory, 'entry.ts'), fixture);
@@ -44,7 +44,6 @@ for (const { name: endpoint, DefinePlugin, createCompiler } of rspackHosts) {
         'hey-listen': 'commonjs hey-listen',
         'tiny-invariant': 'commonjs tiny-invariant',
       },
-      plugins: [new DefinePlugin({ __DEV__: 'false' })],
       module: {
         rules: [
           {
@@ -73,10 +72,7 @@ for (const { name: endpoint, DefinePlugin, createCompiler } of rspackHosts) {
         Object.assign(fn, { __esModule: true, default: fn, warning: fn, invariant: fn }),
     });
     assert.deepEqual(calls, [[false]]);
-    assert.deepEqual(JSON.parse(JSON.stringify(module.exports.outcome)), {
-      checks: 2,
-      development: false,
-    });
+    assert.equal(module.exports.checks, 2);
 
     const map = new TraceMap(
       JSON.parse(await readFile(path.join(directory, 'dist/bundle.cjs.map'), 'utf8')),

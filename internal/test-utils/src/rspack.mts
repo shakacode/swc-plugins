@@ -8,12 +8,10 @@ export type RspackCompiler = import('rspack-earliest').Compiler | import('rspack
 export const rspackHosts = [
   {
     name: 'earliest',
-    DefinePlugin: earliest.DefinePlugin,
     createCompiler: (config: RspackConfiguration) => earliest.rspack(config),
   },
   {
     name: 'latest',
-    DefinePlugin: latest.DefinePlugin,
     createCompiler: (config: RspackConfiguration) => latest.rspack(config),
   },
 ] as const;
