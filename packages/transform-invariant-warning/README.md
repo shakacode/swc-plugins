@@ -110,27 +110,27 @@ diagnostic arguments are not evaluated. Imports are retained for the host's
 normal tree shaking.
 
 Only calls written as standalone statements, such as
-`invariant(condition, message);`, are rewritten. Calls used as values and member
-calls are left unchanged:
+`invariant(condition, message);`, are rewritten.
 
-```js
-return invariant(condition, message);
-const result = invariant(condition, message);
-helpers.invariant(condition, message);
-```
+Optional warning calls, such as
+`warning?.(condition, message)`, are removed as well.
+
+What remains unchanged:
+
+- Calls used as values: `return invariant(condition, message)` or
+  `const result = invariant(condition, message)`.
+- Member calls, including namespace calls: `helpers.invariant(condition, message)`.
+- Invariant calls with no arguments or a spread as their first argument.
+- Optional invariant calls: `invariant?.(condition, message)`, to preserve their
+  conditional evaluation.
+- Destructured `require` bindings.
+- Calls to unresolved globals, local functions, or parameters.
+- Calls through shadowed bindings or helpers loaded by a shadowed `require`.
+- Calls through type-only imports or imports from unconfigured sources.
+- Calls through bindings reassigned anywhere in the file.
 
 See the [transformation tests](https://github.com/shakacode/swc-plugins/blob/main/packages/transform-invariant-warning/tests/plugin.test.mts)
 for more examples.
-
-Zero-argument invariants and invariants with a spread as their first argument
-remain unchanged. Optional warning calls are removed; optional invariant calls
-remain unchanged to preserve their conditional evaluation.
-
-Destructured `require` bindings are not transformed.
-
-Unresolved global calls, local functions, parameters, shadowed imports, type-only
-imports, unrelated imports, and shadowed `require` functions are preserved.
-Bindings with detected reassignments are conservatively left unchanged throughout the file.
 
 ## Default sources
 
