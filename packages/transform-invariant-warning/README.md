@@ -11,12 +11,21 @@ Enable it only for production builds; omit it in development and tests.
 
 ## Hosts
 
+If your host is already installed within the supported range below, add only the
+plugin to preserve your existing dependency versions:
+
+```sh
+pnpm add -D swc-plugin-transform-invariant-warning
+```
+
 ### Rspack
 
 This plugin supports Rspack `>=2.2.0 <3.0.0` through `builtin:swc-loader`.
 
+For a new Rspack setup:
+
 ```sh
-pnpm add -D swc-plugin-transform-invariant-warning
+pnpm add -D @rspack/cli @rspack/core swc-plugin-transform-invariant-warning
 ```
 
 ```js
@@ -54,7 +63,10 @@ export default {
 
 ### SWC CLI
 
-Install the [SWC CLI](https://swc.rs/docs/usage/cli) and plugin:
+This plugin supports `@swc/core` `>=1.16.0 <2.0.0`. The CLI example is tested
+with `@swc/cli` `0.8.2`.
+
+For a new [SWC CLI](https://swc.rs/docs/usage/cli) setup:
 
 ```sh
 pnpm add -D @swc/cli @swc/core swc-plugin-transform-invariant-warning
