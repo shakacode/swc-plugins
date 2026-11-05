@@ -134,18 +134,23 @@ to preserve their conditional evaluation.
 ### Defining `__DEV__`
 
 This plugin does not replace `__DEV__`. If your application or its dependencies
-use `__DEV__`, define it in your build and test configuration. The build examples
-below use `false` for production; use `true` for development and tests.
+use `__DEV__`, define it in your build and test configuration. The build examples below
+assume a `production` boolean, defined for example as:
 
-| Tool           | Configuration                                                                    | Documentation                                                                                   |
-| -------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Rspack         | `plugins: [new rspack.DefinePlugin({ __DEV__: 'false' })]`                       | [DefinePlugin](https://rspack.dev/plugins/define-plugin)                                        |
-| webpack        | `plugins: [new webpack.DefinePlugin({ __DEV__: 'false' })]`                      | [DefinePlugin](https://webpack.js.org/plugins/define-plugin/)                                   |
-| Vite           | `define: { __DEV__: 'false' }`                                                   | [define](https://vite.dev/config/shared-options.html#define)                                    |
-| esbuild        | `define: { __DEV__: 'false' }`                                                   | [define](https://esbuild.github.io/api/#define)                                                 |
-| Standalone SWC | `jsc: { transform: { optimizer: { globals: { vars: { __DEV__: 'false' } } } } }` | [optimizer.globals](https://swc.rs/docs/configuration/compilation#jsctransformoptimizerglobals) |
-| Jest           | `globals: { __DEV__: true }`                                                     | [globals](https://jestjs.io/docs/configuration#globals-object)                                  |
-| Vitest         | `define: { __DEV__: 'true' }` (top level, outside `test`)                        | [Configuration](https://vitest.dev/config/)                                                     |
+```js
+const production = process.env.NODE_ENV === 'production';
+```
+
+| Tool           | Configuration                                                                                        | Documentation                                                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Rspack         | `plugins: [new rspack.DefinePlugin({ __DEV__: !production })]`                                       | [DefinePlugin](https://rspack.dev/plugins/define-plugin)                                        |
+| webpack        | `plugins: [new webpack.DefinePlugin({ __DEV__: !production })]`                                      | [DefinePlugin](https://webpack.js.org/plugins/define-plugin/)                                   |
+| Vite           | `define: { __DEV__: !production }`                                                                   | [define](https://vite.dev/config/shared-options.html#define)                                    |
+| esbuild        | `define: { __DEV__: JSON.stringify(!production) }`                                                   | [define](https://esbuild.github.io/api/#define)                                                 |
+| Standalone SWC | `jsc: { transform: { optimizer: { globals: { vars: { __DEV__: JSON.stringify(!production) } } } } }` | [optimizer.globals](https://swc.rs/docs/configuration/compilation#jsctransformoptimizerglobals) |
+| Jest           | `globals: { __DEV__: true }`                                                                         | [globals](https://jestjs.io/docs/configuration#globals-object)                                  |
+| Rstest         | `source: { define: { __DEV__: true } }`                                                              | [source.define](https://rstest.rs/config/build/source#sourcedefine)                             |
+| Vitest         | `define: { __DEV__: true }` (top level, outside `test`)                                              | [Configuration](https://vitest.dev/config/)                                                     |
 
 Build-time replacements cover dependencies processed by your build. For
 dependencies loaded directly at runtime, provide `__DEV__` through your runtime
