@@ -108,6 +108,20 @@ fn value_root(expr: &Expr) -> Option<&Ident> {
     expression_callee(expr).and_then(value_root)
 }
 
+fn pattern_bindings(pattern: &Pat) -> HashSet<Id> {
+    #[derive(Default)]
+    struct BoundNames(HashSet<Id>);
+    impl Visit for BoundNames {
+        fn visit_binding_ident(&mut self, id: &BindingIdent) {
+            self.0.insert(id.to_id());
+        }
+        fn visit_expr(&mut self, _: &Expr) {}
+    }
+    let mut names = BoundNames::default();
+    pattern.visit_with(&mut names);
+    names.0
+}
+
 pub struct Bindings<'a> {
     pub kinds: HashMap<Id, Kind>,
     pub all: HashSet<Id>,
@@ -225,6 +239,23 @@ impl<'a> Bindings<'a> {
         result
     }
 
+    fn derive(&mut self, mut names: HashSet<Id>, expr: &Expr) {
+        let Some(first) = names.iter().next().cloned() else {
+            return;
+        };
+        let mut references = Identifiers::default();
+        expr.visit_with(&mut references);
+        // One binding connects references and names without a complete graph.
+        for source in references.0.difference(&names) {
+            self.derived
+                .entry(source.clone())
+                .or_default()
+                .push(first.clone());
+        }
+        names.remove(&first);
+        self.derived.entry(first).or_default().extend(names);
+    }
+
     fn required(&self, expr: &Expr) -> Option<String> {
         let expr = interop_argument(expr, &self.interop_helpers).unwrap_or(expr);
         let Expr::Call(call) = unwrapped(expr) else {
@@ -324,36 +355,13 @@ impl Visit for Bindings<'_> {
         if let Some(init) = &decl.init {
             let required_source = self.required(init);
             if !matches!(decl.name, Pat::Ident(_)) {
-                #[derive(Default)]
-                struct BoundNames(HashSet<Id>);
-                impl Visit for BoundNames {
-                    fn visit_binding_ident(&mut self, id: &BindingIdent) {
-                        self.0.insert(id.to_id());
-                    }
-                }
-                let mut names = BoundNames::default();
-                decl.name.visit_with(&mut names);
+                let names = pattern_bindings(&decl.name);
                 if let Some(source) = &required_source {
-                    for id in &names.0 {
-                        self.sources.insert(id.clone(), source.clone());
+                    for id in names {
+                        self.sources.insert(id, source.clone());
                     }
-                }
-                if let Some(first) = names.0.iter().next().cloned() {
-                    // Connect the pattern through one binding to avoid a complete
-                    // graph between initializer references and declared names.
-                    let mut references = Identifiers::default();
-                    decl.name.visit_with(&mut references);
-                    if required_source.is_none() {
-                        init.visit_with(&mut references);
-                    }
-                    for source in references.0.difference(&names.0) {
-                        self.derived
-                            .entry(source.clone())
-                            .or_default()
-                            .push(first.clone());
-                    }
-                    names.0.remove(&first);
-                    self.derived.entry(first).or_default().extend(names.0);
+                } else {
+                    self.derive(names, init);
                 }
             }
 
@@ -413,6 +421,18 @@ impl Visit for Bindings<'_> {
             }
         }
         decl.visit_children_with(self);
+    }
+
+    fn visit_assign_pat(&mut self, pattern: &AssignPat) {
+        self.derive(pattern_bindings(&pattern.left), &pattern.right);
+        pattern.visit_children_with(self);
+    }
+
+    fn visit_assign_pat_prop(&mut self, property: &AssignPatProp) {
+        if let Some(value) = &property.value {
+            self.derive(HashSet::from([property.key.to_id()]), value);
+        }
+        property.visit_children_with(self);
     }
 
     fn visit_assign_expr(&mut self, expr: &AssignExpr) {

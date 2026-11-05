@@ -596,3 +596,21 @@ for (const expression of [
     assert.deepEqual(result, { value: { count: 1 }, loads: [] });
   });
 }
+
+for (const source of [
+  'function run({ validate = PT.string } = {}) { validate.custom = 42; return validate.custom; } exports.value = run();',
+  'const run = ({ validate = PT.string } = {}) => { validate.custom = 42; return validate.custom; }; exports.value = run();',
+  'function run([validate = PT.string] = []) { validate.custom = 42; return validate.custom; } exports.value = run();',
+  'function run(validate = PT.string) { validate.custom = 42; return validate.custom; } exports.value = run();',
+  'class Container { run({ validate = PT.string } = {}) { validate.custom = 42; return validate.custom; } } exports.value = new Container().run();',
+  'class Container { constructor({ validate = PT.string } = {}) { validate.custom = 42; this.value = validate.custom; } } exports.value = new Container().value;',
+  'try { throw {}; } catch ({ validate = PT.string }) { validate.custom = 42; exports.value = validate.custom; }',
+  'const target = { set value({ validate = PT.string }) { validate.custom = 42; exports.value = validate.custom; } }; target.value = {};',
+]) {
+  test(`pattern defaults retain mutation protection: ${source}`, () => {
+    assert.deepEqual(
+      evaluate(`const PT = require('prop-types'); ${source}`, { removeValidators: true }),
+      { value: { value: 42 }, loads: ['prop-types'] },
+    );
+  });
+}
