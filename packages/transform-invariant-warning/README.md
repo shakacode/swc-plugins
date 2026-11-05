@@ -2,29 +2,36 @@
 
 [Changelog](CHANGELOG.md)
 
-A production-only SWC Wasm transform that removes warning calls and strips
+An SWC Wasm transform that removes warning calls and strips
 invariant diagnostic arguments while retaining invariant failures.
 
-Related prior art: [babel-plugin-dev-expression](https://github.com/4Catalyzer/babel-plugin-dev-expression).
-This plugin performs the production rewrites directly. Enable it only for
-production builds; development builds should omit it.
+Enable it only for production builds; omit it in development and tests.
 
-## Usage with Rspack
+Inspired by the [babel-plugin-dev-expression](https://github.com/4Catalyzer/babel-plugin-dev-expression) Babel plugin.
+Unlike it, we do not rewrite `__DEV__`; if you want to do that, see [below](#defining-__dev__).
+
+## Hosts
+
+Install the plugin:
 
 ```sh
 pnpm add -D swc-plugin-transform-invariant-warning
 ```
+
+### Rspack
+
+This plugin supports Rspack `>=2.2.0 <3.0.0` through `builtin:swc-loader`.
 
 ```js
 import { createRequire } from 'node:module';
 import { rspack } from '@rspack/core';
 
 const require = createRequire(import.meta.url);
-const mode = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+const production = process.env.NODE_ENV === 'production';
 
 export default {
-  mode,
-  plugins: [new rspack.DefinePlugin({ __DEV__: JSON.stringify(mode !== 'production') })],
+  mode: production ? 'production' : 'development',
+  plugins: [new rspack.DefinePlugin({ __DEV__: !production })],
   module: {
     rules: [
       {
@@ -35,10 +42,9 @@ export default {
           jsc: {
             parser: { syntax: 'typescript', tsx: true },
             experimental: {
-              plugins:
-                mode === 'production'
-                  ? [[require.resolve('swc-plugin-transform-invariant-warning'), {}]]
-                  : [],
+              plugins: production
+                ? [[require.resolve('swc-plugin-transform-invariant-warning'), {}]]
+                : [],
             },
           },
         },
@@ -48,9 +54,34 @@ export default {
 };
 ```
 
-`__DEV__` is left to Rspack's `DefinePlugin`; this plugin does not rewrite it.
-Set it explicitly in other environments, including tests. The same Wasm artifact
-targets Rspack 2.2.0 and the latest supported 2.x release through `builtin:swc-loader`.
+### SWC CLI
+
+This plugin supports `@swc/core` `>=1.16.0 <2.0.0`. The CLI example is tested
+with `@swc/cli` `0.8.2`.
+
+Create `.swcrc.production.json` for the [SWC CLI](https://swc.rs/docs/usage/cli):
+
+```json
+{
+  "jsc": {
+    "parser": { "syntax": "typescript", "tsx": true },
+    "experimental": {
+      "plugins": [["swc-plugin-transform-invariant-warning", {}]]
+    },
+    "transform": {
+      "optimizer": {
+        "globals": { "vars": { "__DEV__": "false" } }
+      }
+    }
+  }
+}
+```
+
+Use this configuration only for production builds:
+
+```sh
+pnpm exec swc src --out-dir dist --config-file .swcrc.production.json
+```
 
 ## Rewrites
 
@@ -76,13 +107,30 @@ import invariant from 'invariant';
 
 Warning arguments are not evaluated. An invariant condition is evaluated once;
 diagnostic arguments are not evaluated. Imports are retained for the host's
-normal tree shaking. Empty statements and blocks preserve unbraced control flow.
+normal tree shaking.
 
-Only standalone identifier call statements are rewritten. Calls used as return
-values or other expression values, namespace/member calls, zero-argument
-invariants, and invariants with a spread as their first argument remain unchanged.
-Optional warning calls are removed; optional invariant calls remain unchanged
-to preserve their conditional evaluation.
+Only calls written as standalone statements, such as
+`invariant(condition, message);`, are rewritten.
+
+Optional warning calls, such as
+`warning?.(condition, message)`, are removed as well.
+
+What remains unchanged:
+
+- Calls used as values: `return invariant(condition, message)` or
+  `const result = invariant(condition, message)`.
+- Member calls, including namespace calls: `helpers.invariant(condition, message)`.
+- Invariant calls with no arguments or a spread as their first argument.
+- Optional invariant calls: `invariant?.(condition, message)`, to preserve their
+  conditional evaluation.
+- Destructured `require` bindings.
+- Calls to unresolved globals, local functions, or parameters.
+- Calls through shadowed bindings or helpers loaded by a shadowed `require`.
+- Calls through type-only imports or imports from unconfigured sources.
+- Calls through bindings reassigned anywhere in the file.
+
+See the [transformation tests](https://github.com/shakacode/swc-plugins/blob/main/packages/transform-invariant-warning/tests/plugin.test.mts)
+for more examples.
 
 ## Default sources
 
@@ -105,39 +153,15 @@ import { warning as warn, invariant as assert } from 'hey-listen';
 
 A source may appear in both lists. Its named exports remain unambiguous; its
 default export, direct `require`, and import-equals bindings are left unchanged.
-CommonJS destructured named bindings are outside the initial scope.
-
-Unresolved global calls, local functions, parameters, shadowed imports, type-only
-imports, unrelated imports, and shadowed `require` functions are preserved.
-Bindings with detected reassignments are conservatively left unchanged throughout the file.
 
 ## Options
 
-TypeScript consumers can import the generated options type:
+Import the options type in TypeScript:
 
 ```ts
 import type { PluginOptions } from 'swc-plugin-transform-invariant-warning';
 
 const options = { invariantSources: ['tiny-invariant'] } satisfies PluginOptions;
-```
-
-```json
-{
-  "warningSources": [
-    "warning",
-    "tiny-warning",
-    "fbjs/lib/warning",
-    "fbjs/lib/warning.js",
-    "hey-listen"
-  ],
-  "invariantSources": [
-    "invariant",
-    "tiny-invariant",
-    "fbjs/lib/invariant",
-    "fbjs/lib/invariant.js",
-    "hey-listen"
-  ]
-}
 ```
 
 - `warningSources` and `invariantSources` **replace** their respective defaults.
@@ -161,6 +185,31 @@ desired, add it to `invariantSources`:
   ]
 }
 ```
+
+## Defining `__DEV__`
+
+This plugin does not replace `__DEV__`. If your application or its dependencies
+use `__DEV__`, define it in your build and test configuration. The build examples below
+assume a `production` boolean, defined for example as:
+
+```js
+const production = process.env.NODE_ENV === 'production';
+```
+
+| Tool           | Configuration                                                                                        | Documentation                                                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Rspack         | `plugins: [new rspack.DefinePlugin({ __DEV__: !production })]`                                       | [DefinePlugin](https://rspack.dev/plugins/define-plugin)                                        |
+| webpack        | `plugins: [new webpack.DefinePlugin({ __DEV__: !production })]`                                      | [DefinePlugin](https://webpack.js.org/plugins/define-plugin/)                                   |
+| Vite           | `define: { __DEV__: !production }`                                                                   | [define](https://vite.dev/config/shared-options.html#define)                                    |
+| esbuild        | `define: { __DEV__: JSON.stringify(!production) }`                                                   | [define](https://esbuild.github.io/api/#define)                                                 |
+| Standalone SWC | `jsc: { transform: { optimizer: { globals: { vars: { __DEV__: JSON.stringify(!production) } } } } }` | [optimizer.globals](https://swc.rs/docs/configuration/compilation#jsctransformoptimizerglobals) |
+| Jest           | `globals: { __DEV__: true }`                                                                         | [globals](https://jestjs.io/docs/configuration#globals-object)                                  |
+| Rstest         | `source: { define: { __DEV__: true } }`                                                              | [source.define](https://rstest.rs/config/build/source#sourcedefine)                             |
+| Vitest         | `define: { __DEV__: true }` (top level, outside `test`)                                              | [Configuration](https://vitest.dev/config/)                                                     |
+
+Build-time replacements cover dependencies processed by your build. For
+dependencies loaded directly at runtime, provide `__DEV__` through your runtime
+or test setup instead.
 
 ## License
 
