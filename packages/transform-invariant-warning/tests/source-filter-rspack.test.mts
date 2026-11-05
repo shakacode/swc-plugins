@@ -1,13 +1,17 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-import earliest from 'rspack-earliest';
-import latest from 'rspack-latest';
+import {
+  rspackHosts,
+  runCompiler,
+  closeCompiler,
+  type RspackConfiguration,
+} from '@swc-plugins/test-utils/rspack';
 import { createSourceFilter } from 'swc-plugin-transform-invariant-warning/source-filter';
+import { temporaryDirectory } from '@swc-plugins/test-utils/temp-dir';
 
 const plugin = fileURLToPath(new URL('../plugin.wasm', import.meta.url));
 const inputs = {
@@ -67,37 +71,18 @@ function configuration(directory: string, filtered: boolean, watch: boolean) {
         },
       ],
     },
-  } satisfies import('rspack-earliest').Configuration & import('rspack-latest').Configuration;
+  } satisfies RspackConfiguration;
 }
 
-for (const [endpoint] of [
-  ['earliest', earliest],
-  ['latest', latest],
-] as const) {
+for (const { name: endpoint, createCompiler } of rspackHosts) {
   test(`source filter preserves code and maps on ${endpoint} Rspack`, async (t) => {
-    const directory = await mkdtemp(path.join(tmpdir(), 'source-filter-rspack-'));
-    t.after(() => rm(directory, { recursive: true, force: true }));
+    const directory = temporaryDirectory(t, 'source-filter-rspack-');
     for (const [name, source] of Object.entries(inputs)) {
       await writeFile(path.join(directory, `${name}.ts`), source);
     }
     async function build(filtered: boolean): Promise<Record<string, string>> {
       const config = configuration(directory, filtered, false);
-      const compiler = endpoint === 'earliest' ? earliest.rspack(config) : latest.rspack(config);
-      await new Promise<void>((resolve, reject) =>
-        compiler.run((error, stats) => {
-          compiler.close((closeError) => {
-            if (error || closeError || !stats || stats.hasErrors()) {
-              reject(
-                error ||
-                  closeError ||
-                  new Error(stats?.toString({ all: false, errors: true }) || 'Missing stats'),
-              );
-            } else {
-              resolve();
-            }
-          });
-        }),
-      );
+      await runCompiler(createCompiler(config));
       const names = (await readdir(path.join(directory, 'out'))).sort();
       return Object.fromEntries(
         await Promise.all(
@@ -119,12 +104,11 @@ for (const [endpoint] of [
   });
 
   test(`watch retains the guest when an import is added on ${endpoint} Rspack`, async (t) => {
-    const directory = await mkdtemp(path.join(tmpdir(), 'source-filter-watch-'));
-    t.after(() => rm(directory, { recursive: true, force: true }));
+    const directory = temporaryDirectory(t, 'source-filter-watch-');
     const filename = path.join(directory, 'plain.ts');
     await writeFile(filename, inputs.plain);
     const config = { ...configuration(directory, true, true), entry: './plain.ts' };
-    const compiler = endpoint === 'earliest' ? earliest.rspack(config) : latest.rspack(config);
+    const compiler = createCompiler(config);
     let watching: ReturnType<typeof compiler.watch> | undefined;
     try {
       await new Promise<void>((resolve, reject) => {
@@ -180,9 +164,7 @@ for (const [endpoint] of [
       if (watching) {
         await new Promise<void>((resolve) => watching!.close(resolve));
       }
-      await new Promise<void>((resolve, reject) =>
-        compiler.close((error) => (error ? reject(error) : resolve())),
-      );
+      await closeCompiler(compiler);
     }
   });
 }

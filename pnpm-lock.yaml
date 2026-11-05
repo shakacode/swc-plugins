@@ -17,6 +17,9 @@ importers:
       '@jridgewell/trace-mapping':
         specifier: 0.3.31
         version: 0.3.31
+      '@swc-plugins/test-utils':
+        specifier: workspace:*
+        version: link:internal-packages/test-utils
       '@swc/core':
         specifier: 1.16.21
         version: 1.16.21
@@ -38,12 +41,6 @@ importers:
       publint:
         specifier: 0.3.25
         version: 0.3.25
-      rspack-earliest:
-        specifier: npm:@rspack/core@2.2.0
-        version: /@rspack/core@2.2.0
-      rspack-latest:
-        specifier: npm:@rspack/core@^2.2.0
-        version: /@rspack/core@2.3.0
       semver:
         specifier: 7.8.6
         version: 7.8.6
@@ -51,7 +48,20 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
-  packages/transform-invariant-warning: {}
+  internal-packages/test-utils:
+    dependencies:
+      rspack-earliest:
+        specifier: npm:@rspack/core@2.2.0
+        version: /@rspack/core@2.2.0
+      rspack-latest:
+        specifier: npm:@rspack/core@^2.2.0
+        version: /@rspack/core@2.3.0
+
+  packages/transform-invariant-warning:
+    devDependencies:
+      '@swc-plugins/test-utils':
+        specifier: workspace:*
+        version: link:../../internal-packages/test-utils
 
 packages:
 
@@ -299,7 +309,7 @@ packages:
     dependencies:
       '@emnapi/wasi-threads': 1.2.3
       tslib: 2.9.1
-    dev: true
+    dev: false
     optional: true
 
   /@emnapi/runtime@1.11.3:
@@ -307,7 +317,7 @@ packages:
     requiresBuild: true
     dependencies:
       tslib: 2.9.1
-    dev: true
+    dev: false
     optional: true
 
   /@emnapi/wasi-threads@1.2.3:
@@ -315,7 +325,7 @@ packages:
     requiresBuild: true
     dependencies:
       tslib: 2.9.1
-    dev: true
+    dev: false
     optional: true
 
   /@jridgewell/resolve-uri@3.1.2:
@@ -350,7 +360,7 @@ packages:
       '@emnapi/core': 1.11.3
       '@emnapi/runtime': 1.11.3
       '@tybys/wasm-util': 0.10.4
-    dev: true
+    dev: false
     optional: true
 
   /@oxfmt/binding-android-arm-eabi@0.75.0:
@@ -755,7 +765,7 @@ packages:
     cpu: [arm64]
     os: [darwin]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-darwin-arm64@2.3.0:
@@ -763,7 +773,7 @@ packages:
     cpu: [arm64]
     os: [darwin]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-darwin-x64@2.2.0:
@@ -771,7 +781,7 @@ packages:
     cpu: [x64]
     os: [darwin]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-darwin-x64@2.3.0:
@@ -779,7 +789,7 @@ packages:
     cpu: [x64]
     os: [darwin]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-arm64-gnu@2.2.0:
@@ -787,7 +797,7 @@ packages:
     cpu: [arm64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-arm64-gnu@2.3.0:
@@ -795,7 +805,7 @@ packages:
     cpu: [arm64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-arm64-musl@2.2.0:
@@ -803,7 +813,7 @@ packages:
     cpu: [arm64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-arm64-musl@2.3.0:
@@ -811,7 +821,7 @@ packages:
     cpu: [arm64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-ppc64-gnu@2.2.0:
@@ -819,7 +829,7 @@ packages:
     cpu: [ppc64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-ppc64-gnu@2.3.0:
@@ -827,7 +837,7 @@ packages:
     cpu: [ppc64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-riscv64-gnu@2.2.0:
@@ -835,7 +845,7 @@ packages:
     cpu: [riscv64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-riscv64-gnu@2.3.0:
@@ -843,7 +853,7 @@ packages:
     cpu: [riscv64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-riscv64-musl@2.2.0:
@@ -851,7 +861,7 @@ packages:
     cpu: [riscv64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-riscv64-musl@2.3.0:
@@ -859,7 +869,7 @@ packages:
     cpu: [riscv64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-s390x-gnu@2.2.0:
@@ -867,7 +877,7 @@ packages:
     cpu: [s390x]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-s390x-gnu@2.3.0:
@@ -875,7 +885,7 @@ packages:
     cpu: [s390x]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-x64-gnu@2.2.0:
@@ -883,7 +893,7 @@ packages:
     cpu: [x64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-x64-gnu@2.3.0:
@@ -891,7 +901,7 @@ packages:
     cpu: [x64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-x64-musl@2.2.0:
@@ -899,7 +909,7 @@ packages:
     cpu: [x64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-linux-x64-musl@2.3.0:
@@ -907,7 +917,7 @@ packages:
     cpu: [x64]
     os: [linux]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-wasm32-wasi@2.2.0:
@@ -918,7 +928,7 @@ packages:
       '@emnapi/core': 1.11.3
       '@emnapi/runtime': 1.11.3
       '@napi-rs/wasm-runtime': 1.1.6(@emnapi/core@1.11.3)(@emnapi/runtime@1.11.3)
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-wasm32-wasi@2.3.0:
@@ -929,7 +939,7 @@ packages:
       '@emnapi/core': 1.11.3
       '@emnapi/runtime': 1.11.3
       '@napi-rs/wasm-runtime': 1.1.6(@emnapi/core@1.11.3)(@emnapi/runtime@1.11.3)
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-win32-arm64-msvc@2.2.0:
@@ -937,7 +947,7 @@ packages:
     cpu: [arm64]
     os: [win32]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-win32-arm64-msvc@2.3.0:
@@ -945,7 +955,7 @@ packages:
     cpu: [arm64]
     os: [win32]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-win32-ia32-msvc@2.2.0:
@@ -953,7 +963,7 @@ packages:
     cpu: [ia32]
     os: [win32]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-win32-ia32-msvc@2.3.0:
@@ -961,7 +971,7 @@ packages:
     cpu: [ia32]
     os: [win32]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-win32-x64-msvc@2.2.0:
@@ -969,7 +979,7 @@ packages:
     cpu: [x64]
     os: [win32]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding-win32-x64-msvc@2.3.0:
@@ -977,7 +987,7 @@ packages:
     cpu: [x64]
     os: [win32]
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /@rspack/binding@2.2.0:
@@ -997,7 +1007,7 @@ packages:
       '@rspack/binding-win32-arm64-msvc': 2.2.0
       '@rspack/binding-win32-ia32-msvc': 2.2.0
       '@rspack/binding-win32-x64-msvc': 2.2.0
-    dev: true
+    dev: false
 
   /@rspack/binding@2.3.0:
     resolution: {integrity: sha512-rh9S5xvGVs73gdqMDMYXi3SHUfCWIChlL7a8zaYF8+1HLtIgdMyxa100f1ifAKlr8VoyFUv3xrfGLBaoxwjU5g==}
@@ -1016,7 +1026,7 @@ packages:
       '@rspack/binding-win32-arm64-msvc': 2.3.0
       '@rspack/binding-win32-ia32-msvc': 2.3.0
       '@rspack/binding-win32-x64-msvc': 2.3.0
-    dev: true
+    dev: false
 
   /@rspack/core@2.2.0:
     resolution: {integrity: sha512-3W7oX0BAHbK4VlknH3lfyfRvupzxdZtyEa+DfKmdjzmIAcqYtHnFd0nLqp5dzitDPyDI1TIKkDhpB0AZJn0pVg==}
@@ -1031,7 +1041,7 @@ packages:
         optional: true
     dependencies:
       '@rspack/binding': 2.2.0
-    dev: true
+    dev: false
 
   /@rspack/core@2.3.0:
     resolution: {integrity: sha512-1zylQSMl3xo1f57ZqJMHAoVddRv1BSvpQQVIgWjP51AGhLyeHTAfEf0mphb0wb0bOUf5EujpvvO592X9GMf2qQ==}
@@ -1046,7 +1056,7 @@ packages:
         optional: true
     dependencies:
       '@rspack/binding': 2.3.0
-    dev: true
+    dev: false
 
   /@simple-libs/child-process-utils@2.0.0:
     resolution: {integrity: sha512-dvNoRKLijXnD0XoJAz94pbNuB5GQgDr55UhpSPhffDkTT0Cmcqh9jSCOtwfT2d4H6MI9E7c4SgtMuJXZ6F3c6A==}
@@ -1215,7 +1225,7 @@ packages:
     requiresBuild: true
     dependencies:
       tslib: 2.9.1
-    dev: true
+    dev: false
     optional: true
 
   /@types/node@24.19.2:
@@ -2023,7 +2033,7 @@ packages:
   /tslib@2.9.1:
     resolution: {integrity: sha512-a4Ux9VKuIMHsOS7ENbEq6hK2ZGYIT27Rtl0E4eD9KqwxhKiQeMZE/9xb3IdYwWaSOyIBQLExhQgXDTYoiCxnWA==}
     requiresBuild: true
-    dev: true
+    dev: false
     optional: true
 
   /typescript@5.6.1-rc:

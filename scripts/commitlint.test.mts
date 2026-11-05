@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { execCommitlint } from './lib/commitlint.mts';
+import { temporaryDirectory } from '@swc-plugins/test-utils/temp-dir';
 
 for (const title of [
   'tooling: check PR titles',
@@ -43,8 +43,7 @@ for (const title of [
 }
 
 test('CI checks only the edited PR title without executing title text', (t) => {
-  const directory = mkdtempSync(path.join(tmpdir(), 'scoped-pr-titles-'));
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const directory = temporaryDirectory(t, 'scoped-pr-titles-');
   const eventPath = path.join(directory, 'event.json');
   const marker = path.join(directory, 'must-not-exist');
   function run(title: unknown, eventName = 'pull_request') {

@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, type TestContext } from 'node:test';
 import { changelogRelease, main, prepareRelease, publishRelease, releasePlan } from './release.mts';
 import { stampChangelog, updatePackageChangelog } from './update-changelog.mts';
 import { verifyReleaseTag } from './verify-release-tag.mts';
+import { temporaryDirectory } from '@swc-plugins/test-utils/temp-dir';
 
 const changelog = (version = '0.2.0', notes = '### Added\n\n- A useful change.') =>
   `# Changelog\n\n## Unreleased\n\n## ${version} - 2026-11-03\n\n${notes}\n\n## 0.1.0 - 2026-10-01\n\n- Older change.\n`;
@@ -138,8 +138,7 @@ test('checks both package metadata and every prior changelog version', (t) => {
 });
 
 function fixture(t: TestContext) {
-  const directory = mkdtempSync(path.join(tmpdir(), 'swc-release-test-'));
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const directory = temporaryDirectory(t, 'swc-release-test-');
   const root = path.join(directory, 'checkout');
   mkdirSync(root);
   writeFileSync(

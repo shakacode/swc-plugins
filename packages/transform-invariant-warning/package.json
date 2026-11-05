@@ -41,5 +41,8 @@
     "test": "node --test --test-isolation=none tests/*.test.mts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build:js": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@swc-plugins/test-utils": "workspace:*"
   }
 }

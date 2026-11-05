@@ -38,6 +38,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
+          package-manager-cache: false
 
       - name: Prepare PR diff
         id: prepare

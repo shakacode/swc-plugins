@@ -16,12 +16,14 @@
     "test:commitlint": "node --test --test-isolation=none scripts/commitlint.test.mts",
     "setup": "pnpm install --frozen-lockfile && pnpm build",
     "validate": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm build && pnpm check:packages && pnpm test",
-    "test:release": "node --test --test-isolation=none scripts/release.test.mts"
+    "test:release": "node --test --test-isolation=none scripts/release.test.mts",
+    "update:rspack": "pnpm --filter @swc-plugins/test-utils update rspack-latest"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@commitlint/cli": "21.2.4",
     "@jridgewell/trace-mapping": "0.3.31",
+    "@swc-plugins/test-utils": "workspace:*",
     "@swc/core": "1.16.21",
     "@types/node": "24.19.2",
     "@types/semver": "7.8.0",
@@ -29,8 +31,6 @@
     "oxlint": "1.90.0",
     "oxlint-tsgolint": "7.0.2005",
     "publint": "0.3.25",
-    "rspack-earliest": "npm:@rspack/core@2.2.0",
-    "rspack-latest": "npm:@rspack/core@^2.2.0",
     "semver": "7.8.6",
     "typescript": "7.0.2"
   },
