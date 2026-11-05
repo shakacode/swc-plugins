@@ -5,9 +5,10 @@
 An SWC Wasm transform that removes warning calls and strips
 invariant diagnostic arguments while retaining invariant failures.
 
-Inspired by this Babel plugin: [babel-plugin-dev-expression](https://github.com/4Catalyzer/babel-plugin-dev-expression).
-
 Enable it only for production builds; omit it in development and tests.
+
+Inspired by the [babel-plugin-dev-expression](https://github.com/4Catalyzer/babel-plugin-dev-expression) Babel plugin.
+Unlike it, we do not rewrite `__DEV__`; if you want to do that, see [below](#defining-__dev__).
 
 ## Hosts
 
@@ -108,39 +109,22 @@ Warning arguments are not evaluated. An invariant condition is evaluated once;
 diagnostic arguments are not evaluated. Imports are retained for the host's
 normal tree shaking.
 
+Only calls written as standalone statements, such as
+`invariant(condition, message);`, are rewritten. Calls used as values and member
+calls are left unchanged:
+
+```js
+return invariant(condition, message);
+const result = invariant(condition, message);
+helpers.invariant(condition, message);
+```
+
 See the [transformation tests](https://github.com/shakacode/swc-plugins/blob/main/packages/transform-invariant-warning/tests/plugin.test.mts)
 for more examples.
 
-Only standalone identifier call statements are rewritten. Calls used as return
-values or other expression values, namespace/member calls, zero-argument
-invariants, and invariants with a spread as their first argument remain unchanged.
-Optional warning calls are removed; optional invariant calls remain unchanged
-to preserve their conditional evaluation.
-
-### Defining `__DEV__`
-
-This plugin does not replace `__DEV__`. If your application or its dependencies
-use `__DEV__`, define it in your build and test configuration. The build examples below
-assume a `production` boolean, defined for example as:
-
-```js
-const production = process.env.NODE_ENV === 'production';
-```
-
-| Tool           | Configuration                                                                                        | Documentation                                                                                   |
-| -------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Rspack         | `plugins: [new rspack.DefinePlugin({ __DEV__: !production })]`                                       | [DefinePlugin](https://rspack.dev/plugins/define-plugin)                                        |
-| webpack        | `plugins: [new webpack.DefinePlugin({ __DEV__: !production })]`                                      | [DefinePlugin](https://webpack.js.org/plugins/define-plugin/)                                   |
-| Vite           | `define: { __DEV__: !production }`                                                                   | [define](https://vite.dev/config/shared-options.html#define)                                    |
-| esbuild        | `define: { __DEV__: JSON.stringify(!production) }`                                                   | [define](https://esbuild.github.io/api/#define)                                                 |
-| Standalone SWC | `jsc: { transform: { optimizer: { globals: { vars: { __DEV__: JSON.stringify(!production) } } } } }` | [optimizer.globals](https://swc.rs/docs/configuration/compilation#jsctransformoptimizerglobals) |
-| Jest           | `globals: { __DEV__: true }`                                                                         | [globals](https://jestjs.io/docs/configuration#globals-object)                                  |
-| Rstest         | `source: { define: { __DEV__: true } }`                                                              | [source.define](https://rstest.rs/config/build/source#sourcedefine)                             |
-| Vitest         | `define: { __DEV__: true }` (top level, outside `test`)                                              | [Configuration](https://vitest.dev/config/)                                                     |
-
-Build-time replacements cover dependencies processed by your build. For
-dependencies loaded directly at runtime, provide `__DEV__` through your runtime
-or test setup instead.
+Zero-argument invariants and invariants with a spread as their first argument
+remain unchanged. Optional warning calls are removed; optional invariant calls
+remain unchanged to preserve their conditional evaluation.
 
 ## Default sources
 
@@ -200,6 +184,31 @@ desired, add it to `invariantSources`:
   ]
 }
 ```
+
+## Defining `__DEV__`
+
+This plugin does not replace `__DEV__`. If your application or its dependencies
+use `__DEV__`, define it in your build and test configuration. The build examples below
+assume a `production` boolean, defined for example as:
+
+```js
+const production = process.env.NODE_ENV === 'production';
+```
+
+| Tool           | Configuration                                                                                        | Documentation                                                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Rspack         | `plugins: [new rspack.DefinePlugin({ __DEV__: !production })]`                                       | [DefinePlugin](https://rspack.dev/plugins/define-plugin)                                        |
+| webpack        | `plugins: [new webpack.DefinePlugin({ __DEV__: !production })]`                                      | [DefinePlugin](https://webpack.js.org/plugins/define-plugin/)                                   |
+| Vite           | `define: { __DEV__: !production }`                                                                   | [define](https://vite.dev/config/shared-options.html#define)                                    |
+| esbuild        | `define: { __DEV__: JSON.stringify(!production) }`                                                   | [define](https://esbuild.github.io/api/#define)                                                 |
+| Standalone SWC | `jsc: { transform: { optimizer: { globals: { vars: { __DEV__: JSON.stringify(!production) } } } } }` | [optimizer.globals](https://swc.rs/docs/configuration/compilation#jsctransformoptimizerglobals) |
+| Jest           | `globals: { __DEV__: true }`                                                                         | [globals](https://jestjs.io/docs/configuration#globals-object)                                  |
+| Rstest         | `source: { define: { __DEV__: true } }`                                                              | [source.define](https://rstest.rs/config/build/source#sourcedefine)                             |
+| Vitest         | `define: { __DEV__: true }` (top level, outside `test`)                                              | [Configuration](https://vitest.dev/config/)                                                     |
+
+Build-time replacements cover dependencies processed by your build. For
+dependencies loaded directly at runtime, provide `__DEV__` through your runtime
+or test setup instead.
 
 ## License
 
