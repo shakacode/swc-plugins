@@ -70,16 +70,39 @@ fn interop_argument<'a>(expr: &'a Expr, helpers: &HashSet<Id>) -> Option<&'a Exp
         .then_some(&*call.args[0].expr)
 }
 
-fn value_root(expr: &Expr) -> Option<&Ident> {
+pub fn expression_member(expr: &Expr) -> Option<&MemberExpr> {
     match unwrapped(expr) {
-        Expr::Ident(id) => Some(id),
-        Expr::Member(member) => value_root(&member.obj),
-        Expr::Call(call) => match &call.callee {
-            Callee::Expr(callee) => value_root(callee),
+        Expr::Member(member) => Some(member),
+        Expr::OptChain(chain) => match &*chain.base {
+            OptChainBase::Member(member) => Some(member),
             _ => None,
         },
         _ => None,
     }
+}
+
+pub fn expression_callee(expr: &Expr) -> Option<&Expr> {
+    match unwrapped(expr) {
+        Expr::Call(call) => match &call.callee {
+            Callee::Expr(callee) => Some(callee),
+            _ => None,
+        },
+        Expr::OptChain(chain) => match &*chain.base {
+            OptChainBase::Call(call) => Some(&call.callee),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn value_root(expr: &Expr) -> Option<&Ident> {
+    if let Expr::Ident(id) = unwrapped(expr) {
+        return Some(id);
+    }
+    if let Some(member) = expression_member(expr) {
+        return value_root(&member.obj);
+    }
+    expression_callee(expr).and_then(value_root)
 }
 
 pub struct Bindings<'a> {

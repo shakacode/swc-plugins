@@ -400,3 +400,95 @@ test('aggressive mode preserves mutated and unknown optional callees', () => {
     { value: { done: true }, loads: [] },
   );
 });
+
+for (const options of [{}, { removeValidators: true }]) {
+  for (const target of ['module?.exports', "module?.['exports']"]) {
+    test(`preserves optional CommonJS metadata targets: ${target} ${JSON.stringify(options)}`, () => {
+      assert.deepEqual(
+        evaluate(
+          `Object.defineProperty(${target}, 'propTypes', { enumerable: true, value: { field: 42 } });`,
+          options,
+        ),
+        { value: { propTypes: { field: 42 } }, loads: [] },
+      );
+    });
+  }
+}
+
+test('preserves metadata through optional CommonJS aliases and member escapes', () => {
+  assert.deepEqual(
+    evaluate(
+      "const destination = module?.exports; Object.defineProperty(destination, 'propTypes', { enumerable: true, value: { field: 42 } });",
+    ),
+    { value: { propTypes: { field: 42 } }, loads: [] },
+  );
+  assert.deepEqual(
+    evaluate(
+      "exports.child = {}; const destination = exports?.child; Object.defineProperty(destination, 'propTypes', { enumerable: true, value: { field: 42 } });",
+    ),
+    { value: { child: { propTypes: { field: 42 } } }, loads: [] },
+  );
+});
+
+test('optional CommonJS metadata protection uses binding identity', () => {
+  assert.deepEqual(
+    evaluate(
+      "const module = { exports: {} }; Object.defineProperty(module?.exports, 'propTypes', missing()); exports.done = true;",
+    ),
+    { value: { done: true }, loads: [] },
+  );
+});
+
+for (const initializer of ['PT?.string', 'PT?.shape({})', 'PT.shape?.({})', 'PT?.shape?.({})']) {
+  test(`optional member aliases retain mutation protection: ${initializer}`, () => {
+    assert.deepEqual(
+      evaluate(
+        `import PT from 'prop-types'; const validate = ${initializer}; validate.custom = 42; exports.value = validate.custom;`,
+        { removeValidators: true },
+      ),
+      { value: { value: 42 }, loads: ['prop-types'] },
+    );
+  });
+}
+
+test('optional member aliases protect alias chains and other imports of the same source', () => {
+  assert.deepEqual(
+    evaluate(
+      "import PT, { string } from 'prop-types'; const first = PT?.string; const validate = first; validate.custom = 42; exports.value = string.custom;",
+      { removeValidators: true },
+    ),
+    { value: { value: 42 }, loads: ['prop-types'] },
+  );
+});
+
+for (const declaration of [
+  'export const { schema: propTypes } = { schema: { field: PT.string.isRequired } };',
+  'export const { outer: { schema: propTypes } } = { outer: { schema: { field: PT.string.isRequired } } };',
+  'export const [propTypes] = [{ field: PT.string.isRequired }];',
+  'export const { schema: propTypes = { field: PT.string.isRequired } } = {};',
+  'export const { ...propTypes } = { field: PT.string.isRequired };',
+]) {
+  test(`destructured metadata exports retain validator values: ${declaration}`, () => {
+    assert.deepEqual(
+      evaluate(`import PT from 'prop-types'; ${declaration}`, { removeValidators: true }),
+      { value: { propTypes: { field: 'required' } }, loads: ['prop-types'] },
+    );
+  });
+}
+
+test('named metadata function and class exports retain validator values', () => {
+  assert.deepEqual(
+    evaluate(
+      "import PT from 'prop-types'; export function propTypes() { return PT.string; } exports.value = propTypes().isRequired;",
+      { removeValidators: true },
+    ),
+    { value: { value: 'required' }, loads: ['prop-types'] },
+  );
+  assert.deepEqual(
+    evaluate(
+      "import PT from 'prop-types'; export class propTypes { static field = PT.string.isRequired; } exports.value = propTypes.field;",
+      { removeValidators: true },
+    ),
+    { value: { value: 'required' }, loads: ['prop-types'] },
+  );
+});

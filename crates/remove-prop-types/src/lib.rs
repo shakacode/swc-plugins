@@ -1,7 +1,10 @@
 mod bindings;
 mod config;
 
-use bindings::{Bindings, Kind, live_bindings, member_name, text, unwrapped};
+use bindings::{
+    Bindings, Kind, expression_callee, expression_member, live_bindings, member_name, text,
+    unwrapped,
+};
 use config::Config;
 use std::collections::HashSet;
 use swc_core::{
@@ -14,31 +17,6 @@ use swc_core::{
 
 #[cfg(target_arch = "wasm32")]
 use swc_core::plugin::{plugin_transform, proxies::TransformPluginProgramMetadata};
-
-fn expression_member(expr: &Expr) -> Option<&MemberExpr> {
-    match unwrapped(expr) {
-        Expr::Member(member) => Some(member),
-        Expr::OptChain(chain) => match &*chain.base {
-            OptChainBase::Member(member) => Some(member),
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
-fn expression_callee(expr: &Expr) -> Option<&Expr> {
-    match unwrapped(expr) {
-        Expr::Call(call) => match &call.callee {
-            Callee::Expr(callee) => Some(callee),
-            _ => None,
-        },
-        Expr::OptChain(chain) => match &*chain.base {
-            OptChainBase::Call(call) => Some(&call.callee),
-            _ => None,
-        },
-        _ => None,
-    }
-}
 
 fn property_name(property: &PropName) -> Option<&str> {
     match property {
@@ -55,7 +33,9 @@ fn global(expr: &Expr, name: &str, unresolved: SyntaxContext) -> bool {
 
 fn exports_target(expr: &Expr, unresolved: SyntaxContext) -> bool {
     global(expr, "exports", unresolved)
-        || matches!(unwrapped(expr), Expr::Member(member) if member_name(member) == Some("exports") && global(&member.obj, "module", unresolved))
+        || expression_member(expr).is_some_and(|member| {
+            member_name(member) == Some("exports") && global(&member.obj, "module", unresolved)
+        })
 }
 
 fn assignment_member(assignment: &AssignExpr) -> Option<&MemberExpr> {
@@ -88,6 +68,21 @@ fn define_target(call: &CallExpr, unresolved: SyntaxContext) -> Option<&Expr> {
     matches.then_some(&call.args[0].expr)
 }
 
+fn binds_metadata(pattern: &Pat) -> bool {
+    match pattern {
+        Pat::Ident(id) => id.sym == "propTypes",
+        Pat::Array(array) => array.elems.iter().flatten().any(binds_metadata),
+        Pat::Object(object) => object.props.iter().any(|prop| match prop {
+            ObjectPatProp::Assign(value) => value.key.sym == "propTypes",
+            ObjectPatProp::KeyValue(value) => binds_metadata(&value.value),
+            ObjectPatProp::Rest(value) => binds_metadata(&value.arg),
+        }),
+        Pat::Assign(value) => binds_metadata(&value.left),
+        Pat::Rest(value) => binds_metadata(&value.arg),
+        _ => false,
+    }
+}
+
 struct RuntimeMetadata {
     unresolved: SyntaxContext,
     found: bool,
@@ -98,7 +93,8 @@ impl Visit for RuntimeMetadata {
         // including conditionals, calls, and nested assignments. Visit once with
         // member/assignment targets handled separately below.
         if exports_target(expr, self.unresolved)
-            || matches!(unwrapped(expr), Expr::Member(member) if exports_target(&member.obj, self.unresolved))
+            || expression_member(expr)
+                .is_some_and(|member| exports_target(&member.obj, self.unresolved))
         {
             self.found = true;
         }
@@ -162,15 +158,12 @@ impl Visit for RuntimeMetadata {
         decl.visit_children_with(self);
     }
     fn visit_export_decl(&mut self, export: &ExportDecl) {
-        if let Decl::Var(decl) = &export.decl {
-            for declaration in &decl.decls {
-                if let Pat::Ident(id) = &declaration.name
-                    && id.sym == "propTypes"
-                {
-                    self.found = true;
-                }
-            }
-        }
+        self.found |= match &export.decl {
+            Decl::Var(decl) => decl.decls.iter().any(|decl| binds_metadata(&decl.name)),
+            Decl::Fn(decl) => decl.ident.sym == "propTypes",
+            Decl::Class(decl) => decl.ident.sym == "propTypes",
+            _ => false,
+        };
         export.visit_children_with(self);
     }
     fn visit_named_export(&mut self, export: &NamedExport) {
