@@ -29,7 +29,11 @@ export function compile(source: string, options: PluginOptions = {}) {
   }).code;
 }
 
-function evaluate(source: string, options: PluginOptions = {}) {
+function evaluate(
+  source: string,
+  options: PluginOptions = {},
+  modules: Record<string, unknown> = {},
+) {
   const loads: string[] = [];
   const types = createTypes();
   const module = { exports: {} };
@@ -38,7 +42,7 @@ function evaluate(source: string, options: PluginOptions = {}) {
     exports: module.exports,
     require: (name: string) => {
       loads.push(name);
-      return types;
+      return Object.hasOwn(modules, name) ? modules[name] : types;
     },
   });
   return { value: JSON.parse(JSON.stringify(module.exports)), loads };
@@ -614,3 +618,65 @@ for (const source of [
     );
   });
 }
+
+for (const assignment of [
+  'validate = PT.string;',
+  '({ string: validate } = PT);',
+  '[validate] = [PT.string];',
+  '({ validate = PT.string } = {});',
+  'validate ||= PT.string;',
+  'validate ??= PT.string;',
+  '(validate as unknown) = PT.string;',
+]) {
+  test(`assigned validator aliases retain mutation protection: ${assignment}`, () => {
+    assert.deepEqual(
+      evaluate(
+        `const PT = require('prop-types'); let validate; ${assignment} validate.custom = 42; exports.value = validate.custom;`,
+        { removeValidators: true },
+      ),
+      { value: { value: 42 }, loads: ['prop-types'] },
+    );
+  });
+}
+
+test('assigned alias chains protect other imports of the same source', () => {
+  assert.deepEqual(
+    evaluate(
+      "const PT = require('prop-types'); const other = require('prop-types'); let validate; validate = PT.string; const alias = validate; alias.custom = 42; exports.value = other.string.custom;",
+      { removeValidators: true },
+    ),
+    { value: { value: 42 }, loads: ['prop-types', 'prop-types'] },
+  );
+});
+
+for (const options of [{}, { removeValidators: true }]) {
+  for (const setup of [
+    'interop._ = value => { calls++; return value; };',
+    "interop['_'] = value => { calls++; return value; };",
+    'const alias = interop; alias._ = value => { calls++; return value; };',
+  ]) {
+    test(`modified interop wrappers retain their effects: ${setup} ${JSON.stringify(options)}`, () => {
+      const helper = (value: unknown) => ({ default: value });
+      assert.deepEqual(
+        evaluate(
+          `import { _ as interop } from '@swc/helpers/_/_interop_require_default'; let calls = 0; ${setup} const PT = interop._(require('prop-types')); exports.calls = calls;`,
+          options,
+          { '@swc/helpers/_/_interop_require_default': { _: helper } },
+        ),
+        { value: { calls: 1 }, loads: ['@swc/helpers/_/_interop_require_default', 'prop-types'] },
+      );
+    });
+  }
+}
+
+test('modified interop wrappers protect destructured bindings', () => {
+  const helper = (value: unknown) => ({ default: value });
+  assert.deepEqual(
+    evaluate(
+      "import { _ as interop } from '@swc/helpers/_/_interop_require_default'; let calls = 0; interop.default = value => { calls++; return value; }; const { string } = interop.default(require('prop-types')); exports.calls = calls;",
+      {},
+      { '@swc/helpers/_/_interop_require_default': { _: helper } },
+    ),
+    { value: { calls: 1 }, loads: ['@swc/helpers/_/_interop_require_default', 'prop-types'] },
+  );
+});

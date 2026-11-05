@@ -183,3 +183,16 @@ fn optional_validator_construction_drops_arguments_and_required_chains() {
         assert!(!code.contains("prop-types"), "{code}");
     }
 }
+
+#[test]
+fn assignment_targets_with_typescript_wrappers_keep_mutated_aliases() {
+    let code = rewrite("import PT from 'prop-types'; let validate; (validate as Validator) = PT.string; validate.custom = 42; use(validate.custom);", r#"{"removeValidators":true}"#).unwrap();
+    assert!(code.contains("PT.string"), "{code}");
+    assert!(!code.contains("= null"), "{code}");
+}
+
+#[test]
+fn modified_interop_helpers_keep_initializer_effects() {
+    let code = rewrite("import { _ as interop } from '@swc/helpers/_/_interop_require_default'; interop._ = record; const PT = interop._(require('prop-types'));", "{}").unwrap();
+    assert!(code.contains("interop._(require('prop-types'))"), "{code}");
+}

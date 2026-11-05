@@ -108,15 +108,37 @@ fn value_root(expr: &Expr) -> Option<&Ident> {
     expression_callee(expr).and_then(value_root)
 }
 
-fn pattern_bindings(pattern: &Pat) -> HashSet<Id> {
-    #[derive(Default)]
-    struct BoundNames(HashSet<Id>);
-    impl Visit for BoundNames {
-        fn visit_binding_ident(&mut self, id: &BindingIdent) {
+#[derive(Default)]
+struct BoundNames(HashSet<Id>);
+impl Visit for BoundNames {
+    fn visit_binding_ident(&mut self, id: &BindingIdent) {
+        self.0.insert(id.to_id());
+    }
+    fn visit_expr(&mut self, expr: &Expr) {
+        if let Expr::Ident(id) = unwrapped(expr) {
             self.0.insert(id.to_id());
         }
-        fn visit_expr(&mut self, _: &Expr) {}
     }
+    fn visit_simple_assign_target(&mut self, target: &SimpleAssignTarget) {
+        if !matches!(
+            target,
+            SimpleAssignTarget::Member(_)
+                | SimpleAssignTarget::SuperProp(_)
+                | SimpleAssignTarget::OptChain(_)
+        ) {
+            target.visit_children_with(self);
+        }
+    }
+    fn visit_assign_pat(&mut self, pattern: &AssignPat) {
+        pattern.left.visit_with(self);
+    }
+    fn visit_assign_pat_prop(&mut self, property: &AssignPatProp) {
+        property.key.visit_with(self);
+    }
+    fn visit_prop_name(&mut self, _: &PropName) {}
+}
+
+fn pattern_bindings<N: VisitWith<BoundNames>>(pattern: &N) -> HashSet<Id> {
     let mut names = BoundNames::default();
     pattern.visit_with(&mut names);
     names.0
@@ -354,6 +376,15 @@ impl Visit for Bindings<'_> {
     fn visit_var_declarator(&mut self, decl: &VarDeclarator) {
         if let Some(init) = &decl.init {
             let required_source = self.required(init);
+            if interop_argument(init, &self.interop_helpers).is_some()
+                && let Some(helper) = value_root(init)
+            {
+                self.derived
+                    .entry(helper.to_id())
+                    .or_default()
+                    .extend(pattern_bindings(&decl.name));
+            }
+
             if !matches!(decl.name, Pat::Ident(_)) {
                 let names = pattern_bindings(&decl.name);
                 if let Some(source) = &required_source {
@@ -441,6 +472,7 @@ impl Visit for Bindings<'_> {
         let mut written = Identifiers::default();
         expr.left.visit_with(&mut written);
         self.writes.extend(written.0);
+        self.derive(pattern_bindings(&expr.left), &expr.right);
         expr.visit_children_with(self);
     }
 
