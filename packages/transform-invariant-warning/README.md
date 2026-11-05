@@ -26,11 +26,11 @@ import { createRequire } from 'node:module';
 import { rspack } from '@rspack/core';
 
 const require = createRequire(import.meta.url);
-const mode = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+const production = process.env.NODE_ENV === 'production';
 
 export default {
-  mode,
-  plugins: [new rspack.DefinePlugin({ __DEV__: JSON.stringify(mode !== 'production') })],
+  mode: production ? 'production' : 'development',
+  plugins: [new rspack.DefinePlugin({ __DEV__: !production })],
   module: {
     rules: [
       {
@@ -41,10 +41,9 @@ export default {
           jsc: {
             parser: { syntax: 'typescript', tsx: true },
             experimental: {
-              plugins:
-                mode === 'production'
-                  ? [[require.resolve('swc-plugin-transform-invariant-warning'), {}]]
-                  : [],
+              plugins: production
+                ? [[require.resolve('swc-plugin-transform-invariant-warning'), {}]]
+                : [],
             },
           },
         },
