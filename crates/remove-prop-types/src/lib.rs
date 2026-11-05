@@ -15,6 +15,31 @@ use swc_core::{
 #[cfg(target_arch = "wasm32")]
 use swc_core::plugin::{plugin_transform, proxies::TransformPluginProgramMetadata};
 
+fn expression_member(expr: &Expr) -> Option<&MemberExpr> {
+    match unwrapped(expr) {
+        Expr::Member(member) => Some(member),
+        Expr::OptChain(chain) => match &*chain.base {
+            OptChainBase::Member(member) => Some(member),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn expression_callee(expr: &Expr) -> Option<&Expr> {
+    match unwrapped(expr) {
+        Expr::Call(call) => match &call.callee {
+            Callee::Expr(callee) => Some(callee),
+            _ => None,
+        },
+        Expr::OptChain(chain) => match &*chain.base {
+            OptChainBase::Call(call) => Some(&call.callee),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 fn property_name(property: &PropName) -> Option<&str> {
     match property {
         PropName::Ident(id) => Some(id.sym.as_ref()),
@@ -223,29 +248,34 @@ fn validator_factory(name: &str) -> Option<bool> {
 
 impl Rewriter<'_> {
     fn module(&self, expr: &Expr) -> bool {
-        match unwrapped(expr) {
-            Expr::Ident(id) => matches!(self.bindings.kinds.get(&id.to_id()), Some(Kind::Module)),
-            Expr::Member(member) if member_name(member) == Some("default") => {
-                self.module(&member.obj)
-            }
-            _ => false,
+        if let Expr::Ident(id) = unwrapped(expr) {
+            return matches!(self.bindings.kinds.get(&id.to_id()), Some(Kind::Module));
         }
+        expression_member(expr).is_some_and(|member| {
+            member_name(member) == Some("default") && self.module(&member.obj)
+        })
     }
     fn validator(&self, expr: &Expr) -> Option<bool> {
-        match unwrapped(expr) {
-            Expr::Ident(id) => match self.bindings.kinds.get(&id.to_id()) {
+        if let Expr::Ident(id) = unwrapped(expr) {
+            return match self.bindings.kinds.get(&id.to_id()) {
                 Some(Kind::Validator(name)) => validator_factory(name),
                 _ => None,
-            },
-            Expr::Member(member) if self.module(&member.obj) => {
-                validator_factory(member_name(member)?)
-            }
-            _ => None,
+            };
+        }
+        let member = expression_member(expr)?;
+        if self.module(&member.obj) {
+            validator_factory(member_name(member)?)
+        } else {
+            None
         }
     }
     fn required_validator(&self, expr: &Expr) -> bool {
-        matches!(unwrapped(expr), Expr::Member(member) if member_name(member) == Some("isRequired") &&
-            (self.validator(&member.obj).is_some() || matches!(unwrapped(&member.obj), Expr::Call(call) if matches!(&call.callee, Callee::Expr(callee) if self.validator(callee).is_some()))))
+        expression_member(expr).is_some_and(|member| {
+            member_name(member) == Some("isRequired")
+                && (self.validator(&member.obj).is_some()
+                    || expression_callee(&member.obj)
+                        .is_some_and(|callee| self.validator(callee).is_some()))
+        })
     }
     fn removable_assignment(&self, assignment: &AssignExpr) -> bool {
         assignment_member(assignment).is_some_and(|member| {
@@ -320,11 +350,10 @@ impl VisitMut for Rewriter<'_> {
                 *expr = null(expr.span());
                 return;
             }
-            if let Expr::Call(call) = expr
-                && let Callee::Expr(callee) = &call.callee
+            if let Some(callee) = expression_callee(expr)
                 && (self.validator(callee).is_some() || self.required_validator(callee))
             {
-                *expr = undefined(call.span);
+                *expr = undefined(expr.span());
                 return;
             }
             if let Some(factory) = self.validator(expr) {

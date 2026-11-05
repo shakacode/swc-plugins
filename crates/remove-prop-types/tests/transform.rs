@@ -169,3 +169,17 @@ fn unknown_interop_helpers_remain_runtime_calls() {
     assert!(code.contains("PT.string"), "{code}");
     assert!(code.contains("_interopRequireDefault(require"), "{code}");
 }
+
+#[test]
+fn optional_validator_construction_drops_arguments_and_required_chains() {
+    for expression in [
+        "PT.shape?.(missing())",
+        "PT?.shape(missing()).isRequired",
+        "(PT.shape as Factory)?.(missing()).isRequired",
+    ] {
+        let source = format!("import PT from 'prop-types'; exports.value = {expression};");
+        let code = rewrite(&source, r#"{"removeValidators":true}"#).unwrap();
+        assert!(!code.contains("missing"), "{code}");
+        assert!(!code.contains("prop-types"), "{code}");
+    }
+}

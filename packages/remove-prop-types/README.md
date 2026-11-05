@@ -209,7 +209,7 @@ const options: PluginOptions = {
 
 - `removeValidators` defaults to `false`. Standalone validator expressions and
   calls remain available at runtime. Set it to `true` to replace known imported
-  validator reads with `null`, factory calls with `void 0`, and factory references
+  validator reads with `null`, factory calls (including optional calls) with `void 0`, and factory references
   with functions returning `null`. Validator-construction arguments are dropped.
   This disables standalone validation; unknown members such as `checkPropTypes`
   remain unchanged. Detected mutations and redeclarations prevent substitution

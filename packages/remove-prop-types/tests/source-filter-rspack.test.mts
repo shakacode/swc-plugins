@@ -26,6 +26,8 @@ const inputs = {
     "u006fpTypes'] = { value: missing('diagnostic_marker') }; export const value = 3;",
   enumDefinition:
     "const enum Keys { Target = 'prop' + 'Types' } export function Component() {} Component[Keys.Target] = { value: missing('diagnostic_marker') }; export const value = 6;",
+  optionalFactory:
+    "import PT from 'prop-types'; export const value = PT.shape?.(missing('diagnostic_marker')).isRequired;",
   unused: "const PT = require('prop-types'); export const value = 4;",
   lineEndings: 'const PT = require(`custom\r\nvalidators`); export const value = PT.string;',
   nested: 'export function run() { const PT = require(`custom/validators`); return PT.string; }',

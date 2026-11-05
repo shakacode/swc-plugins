@@ -341,3 +341,62 @@ test('retains modules that replace Object or require globals', () => {
     );
   }
 });
+
+for (const expression of [
+  'PT.shape?.(missing())',
+  'PT.shape?.(missing()).isRequired',
+  'PT.shape?.(missing())?.isRequired',
+  'PT.shape(missing())?.isRequired',
+  'PT.shape?.(missing()).isRequired?.(missing())',
+  'PT?.shape(missing())',
+  'PT?.shape?.(missing())',
+  'PT?.shape(missing()).isRequired',
+  'PT?.shape?.(missing())?.isRequired',
+  'PT.string?.(missing())',
+  'PT.string.isRequired?.(missing())',
+  'PT?.string.isRequired',
+  'PT.string?.isRequired',
+]) {
+  test(`aggressive optional validator construction drops arguments: ${expression}`, () => {
+    const result = evaluate(`import PT from 'prop-types'; exports.value = ${expression};`, {
+      removeValidators: true,
+    });
+    assert.deepEqual(result.loads, []);
+    assert.ok(result.value.value === null || result.value.value === undefined);
+  });
+}
+
+test('aggressive optional named-factory calls drop arguments', () => {
+  assert.deepEqual(
+    evaluate(
+      "import { shape } from 'prop-types'; const renamed = shape; exports.value = renamed?.(missing());",
+      { removeValidators: true },
+    ),
+    { value: {}, loads: [] },
+  );
+});
+
+test('default mode preserves optional validator calls and their arguments', () => {
+  assert.deepEqual(
+    evaluate(
+      "import PT from 'prop-types'; let count = 0; PT.shape?.(++count); exports.count = count;",
+    ),
+    { value: { count: 1 }, loads: ['prop-types'] },
+  );
+});
+
+test('aggressive mode preserves mutated and unknown optional callees', () => {
+  assert.deepEqual(
+    evaluate(
+      "import PT from 'prop-types'; PT.shape = value => value; exports.value = PT.shape?.('retained');",
+      { removeValidators: true },
+    ),
+    { value: { value: 'retained' }, loads: ['prop-types'] },
+  );
+  assert.deepEqual(
+    evaluate('const local = undefined; local?.(missing()); exports.done = true;', {
+      removeValidators: true,
+    }),
+    { value: { done: true }, loads: [] },
+  );
+});
