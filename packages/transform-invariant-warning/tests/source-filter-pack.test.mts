@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { temporaryDirectory } from '@swc-plugins/test-utils/temp-dir';
 
 test('packed package exposes compiled ESM, CommonJS and declaration entrypoints', (t) => {
-  const directory = mkdtempSync(path.join(tmpdir(), 'source-filter-package-'));
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const directory = temporaryDirectory(t, 'source-filter-package-');
   const cwd = fileURLToPath(new URL('..', import.meta.url));
   const packed = JSON.parse(
     execFileSync(

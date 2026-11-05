@@ -26,7 +26,7 @@ ESM/CommonJS interop.
 The integration suite uses the same
 artifact with standalone SWC and the earliest and latest supported Rspack releases
 (`>=2.2.0 <3.0.0`). CI refreshes `rspack-latest` within that range on every run,
-including a weekly scheduled run. Run `pnpm update rspack-latest` to refresh it
+including a weekly scheduled run. Run `pnpm update:rspack` to refresh it
 locally; `rspack-earliest` stays pinned to 2.2.0.
 
 Run `pnpm format` to format supported files with Oxfmt and Rust with rustfmt.

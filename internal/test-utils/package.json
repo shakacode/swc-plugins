@@ -1,0 +1,17 @@
+{
+  "name": "@swc-plugins/test-utils",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./rspack": "./src/rspack.mts",
+    "./temp-dir": "./src/temp-dir.mts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "rspack-earliest": "npm:@rspack/core@2.2.0",
+    "rspack-latest": "npm:@rspack/core@^2.2.0"
+  }
+}

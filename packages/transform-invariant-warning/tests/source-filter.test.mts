@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import type { PluginOptions } from '../index.js';
 import { createSourceFilter } from 'swc-plugin-transform-invariant-warning/source-filter';
+import { temporaryDirectory } from '@swc-plugins/test-utils/temp-dir';
 
 const context = { allowSkipping: true, watch: false };
 
@@ -78,8 +78,7 @@ test('validates options eagerly even when every file could be skipped', () => {
 });
 
 test('file filtering fails open, checks changing contents, and supports host readers', (t) => {
-  const directory = mkdtempSync(path.join(tmpdir(), 'source-filter-'));
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const directory = temporaryDirectory(t, 'source-filter-');
   const filename = path.join(directory, 'entry.js');
   const filter = createSourceFilter();
   writeFileSync(filename, 'export const ordinary = 42;');

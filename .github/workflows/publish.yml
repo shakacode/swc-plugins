@@ -62,7 +62,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: pnpm install --frozen-lockfile
       - name: Resolve the newest supported Rspack release
-        run: pnpm update rspack-latest
+        run: pnpm update:rspack
       - run: pnpm format:check
       - run: pnpm typecheck
       - run: pnpm lint
