@@ -1,36 +1,5 @@
-use swc_core::{
-    common::{FileName, GLOBALS, Globals, Mark, SourceMap, sync::Lrc},
-    ecma::{
-        codegen::to_code_default,
-        parser::{Syntax, TsSyntax, parse_file_as_program},
-        transforms::base::resolver,
-        visit::VisitMutWith,
-    },
-};
-use swc_plugin_remove_prop_types::transform;
-
 fn rewrite(source: &str, options: &str) -> Result<String, String> {
-    GLOBALS.set(&Globals::new(), || {
-        let cm: Lrc<SourceMap> = Default::default();
-        let file = cm.new_source_file(
-            FileName::Custom("fixture.ts".into()).into(),
-            source.to_owned(),
-        );
-        let mut errors = vec![];
-        let mut program = parse_file_as_program(
-            &file,
-            Syntax::Typescript(TsSyntax::default()),
-            Default::default(),
-            None,
-            &mut errors,
-        )
-        .unwrap();
-        assert!(errors.is_empty(), "{errors:?}");
-        let unresolved = Mark::new();
-        program.visit_mut_with(&mut resolver(unresolved, Mark::new(), true));
-        transform(&mut program, unresolved, options)?;
-        Ok(to_code_default(cm, None, &program))
-    })
+    swc_plugin_test_utils::rewrite(source, options, swc_plugin_remove_prop_types::transform)
 }
 
 #[test]

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { TestContext } from 'node:test';
 import { TraceMap, originalPositionFor } from '@jridgewell/trace-mapping';
@@ -110,4 +110,111 @@ export function assertSourceMapping(
   assert.equal(original.line, source.slice(0, sourceOffset).split('\n').length);
   assert.ok(original.source?.endsWith(filename), original.source ?? 'missing original source');
   assert.ok(map.sourcesContent?.includes(source));
+}
+
+export function sourceFilterConfiguration(fixture: {
+  directory: string;
+  plugin: string;
+  options: object;
+  entries: readonly string[];
+  externals: Record<string, string>;
+  filtered: boolean;
+  shouldTransform: (resource: string) => boolean;
+}) {
+  const plain = { jsc: { parser: { syntax: 'typescript' as const }, target: 'es2022' as const } };
+  const transformed = {
+    jsc: {
+      ...plain.jsc,
+      experimental: { plugins: [[fixture.plugin, fixture.options] as [string, object]] },
+    },
+  };
+  return {
+    context: fixture.directory,
+    mode: 'production' as const,
+    target: 'node',
+    entry: Object.fromEntries(fixture.entries.map((name) => [name, `./${name}.ts`])),
+    devtool: 'source-map' as const,
+    optimization: { minimize: false },
+    output: {
+      path: path.join(fixture.directory, 'out'),
+      filename: '[name].cjs',
+      library: { type: 'commonjs2' },
+    },
+    externals: fixture.externals,
+    module: {
+      rules: [
+        {
+          test: /\.ts$/,
+          oneOf: [
+            {
+              resource: fixture.shouldTransform,
+              use: [{ loader: 'builtin:swc-loader', options: transformed }],
+            },
+            {
+              use: [
+                { loader: 'builtin:swc-loader', options: fixture.filtered ? plain : transformed },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  } satisfies RspackConfiguration;
+}
+
+export async function readBuildOutputs(directory: string): Promise<Record<string, string>> {
+  const names = (await readdir(directory)).sort();
+  return Object.fromEntries(
+    await Promise.all(
+      names.map(async (name) => [name, await readFile(path.join(directory, name), 'utf8')]),
+    ),
+  );
+}
+
+export async function watchCompiler(
+  compiler: RspackCompiler,
+  onBuild: () => Promise<boolean>,
+): Promise<void> {
+  let watching: ReturnType<typeof compiler.watch> | undefined;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let finished = false;
+      const timeout = setTimeout(() => finish(new Error('Watch rebuild timed out')), 20000);
+      function finish(error?: Error) {
+        if (finished) {
+          return;
+        }
+        finished = true;
+        clearTimeout(timeout);
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      }
+      watching = compiler.watch({ poll: 50, aggregateTimeout: 10 }, (error, stats) => {
+        if (finished) {
+          return;
+        }
+        if (error || !stats || stats.hasErrors()) {
+          finish(
+            error || new Error(stats?.toString({ all: false, errors: true }) || 'Missing stats'),
+          );
+          return;
+        }
+        void onBuild()
+          .then((done) => {
+            if (done) {
+              finish();
+            }
+          })
+          .catch(finish);
+      });
+    });
+  } finally {
+    if (watching) {
+      await new Promise<void>((resolve) => watching!.close(resolve));
+    }
+    await closeCompiler(compiler);
+  }
 }

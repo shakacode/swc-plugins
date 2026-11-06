@@ -1,6 +1,7 @@
+import { packPackage } from '@shakacode/swc-plugin-test-utils/package';
 import { createTemporaryDirectory } from '@shakacode/swc-plugin-test-utils/temp-dir';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,17 +17,7 @@ try {
       continue;
     }
     const directory = path.join(root, 'packages', entry.name);
-    const manifest = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8')) as {
-      name: string;
-      version: string;
-      main?: string;
-      exports: Record<string, unknown>;
-    };
-    run(['pack', '--pack-destination', temporary], directory);
-    const archive = path.join(
-      temporary,
-      `${manifest.name.replace(/^@/, '').replaceAll('/', '-')}-${manifest.version}.tgz`,
-    );
+    const { manifest, archive } = packPackage(directory, temporary);
     run(['exec', 'publint', archive, '--strict']);
     // Analyze JavaScript exports, including the root of utility packages.
     const entrypoints = Object.keys(manifest.exports).filter(

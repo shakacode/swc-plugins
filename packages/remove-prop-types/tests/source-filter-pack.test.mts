@@ -1,8 +1,9 @@
-import { installPackedPackage } from '@shakacode/swc-plugin-test-utils/package';
+import {
+  installPackedPackage,
+  runConsumer,
+  typecheckConsumer,
+} from '@shakacode/swc-plugin-test-utils/package';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
-import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { temporaryDirectory } from '@shakacode/swc-plugin-test-utils/temp-dir';
@@ -24,9 +25,8 @@ test('packed package exposes compiled ESM, CommonJS and declaration entrypoints'
   ]) {
     assert.ok(files.includes(file), file);
   }
-  const consumer = path.join(directory, 'consumer.mjs');
-  writeFileSync(
-    consumer,
+  runConsumer(
+    directory,
     `
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -37,10 +37,8 @@ assert.equal(createSourceFilter().test('ordinary'), false);
 assert.equal(require('swc-plugin-remove-prop-types/source-filter').createSourceFilter().test('propTypes'), true);
 `,
   );
-  execFileSync(process.execPath, [consumer], { cwd: directory, stdio: 'pipe' });
-  const typedConsumer = path.join(directory, 'consumer.mts');
-  writeFileSync(
-    typedConsumer,
+  typecheckConsumer(
+    directory,
     `
 import type { PluginOptions } from 'swc-plugin-remove-prop-types';
 import { createSourceFilter } from 'swc-plugin-remove-prop-types/source-filter';
@@ -50,22 +48,6 @@ const options: PluginOptions = filter.options;
 createSourceFilter(options);
 createSourceFilter(filter.options);
 `,
-  );
-  execFileSync(
-    'pnpm',
-    [
-      'exec',
-      'tsc',
-      '--ignoreConfig',
-      '--noEmit',
-      '--strict',
-      '--skipLibCheck',
-      '--module',
-      'NodeNext',
-      '--target',
-      'ES2022',
-      typedConsumer,
-    ],
-    { cwd, stdio: 'pipe' },
+    cwd,
   );
 });

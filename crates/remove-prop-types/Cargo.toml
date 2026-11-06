@@ -18,9 +18,5 @@ swc_core.workspace = true
 swc_core = { workspace = true, features = ["ecma_plugin_transform"] }
 
 [dev-dependencies]
-ts-rs = "12.0.1"
-swc_core = { workspace = true, features = [
-  "ecma_parser_typescript",
-  "ecma_codegen",
-  "ecma_transforms",
-] }
+ts-rs.workspace = true
+swc-plugin-test-utils = { path = "../../internal-crates/test-utils" }

@@ -1227,6 +1227,17 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_path_to_error",
+ "swc-plugin-test-utils",
+ "swc_core",
+ "ts-rs",
+]
+
+[[package]]
+name = "swc-plugin-test-utils"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
  "swc_core",
  "ts-rs",
 ]
@@ -1238,6 +1249,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_path_to_error",
+ "swc-plugin-test-utils",
  "swc_core",
  "ts-rs",
 ]

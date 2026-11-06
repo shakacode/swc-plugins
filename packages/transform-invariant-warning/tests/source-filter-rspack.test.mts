@@ -1,14 +1,15 @@
+import { executeCommonJS } from '@shakacode/swc-plugin-test-utils/plugin';
 import assert from 'node:assert/strict';
-import { readFile, readdir, writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import vm from 'node:vm';
 import {
   rspackHosts,
   runCompiler,
-  closeCompiler,
-  type RspackConfiguration,
+  sourceFilterConfiguration,
+  readBuildOutputs,
+  watchCompiler,
 } from '@shakacode/swc-plugin-test-utils/rspack';
 import { createSourceFilter } from 'swc-plugin-transform-invariant-warning/source-filter';
 import { temporaryDirectory } from '@shakacode/swc-plugin-test-utils/temp-dir';
@@ -32,46 +33,19 @@ function configuration(directory: string, filtered: boolean, watch: boolean) {
   const filter = createSourceFilter({
     invariantSources: ['invariant', 'custom/assert', 'custom\nassert'],
   });
-  const plain = { jsc: { parser: { syntax: 'typescript' as const }, target: 'es2022' as const } };
-  const transformed = {
-    jsc: {
-      ...plain.jsc,
-      experimental: { plugins: [[plugin, filter.options] as [string, typeof filter.options]] },
-    },
-  };
-  return {
-    context: directory,
-    mode: 'production' as const,
-    target: 'node',
-    entry: Object.fromEntries(Object.keys(inputs).map((name) => [name, `./${name}.ts`])),
-    devtool: 'source-map' as const,
-    optimization: { minimize: false },
-    output: {
-      path: path.join(directory, 'out'),
-      filename: '[name].cjs',
-      library: { type: 'commonjs2' },
-    },
+  return sourceFilterConfiguration({
+    directory,
+    plugin,
+    options: filter.options,
+    entries: Object.keys(inputs),
     externals: {
       invariant: 'commonjs invariant',
       'custom/assert': 'commonjs custom/assert',
       'custom\nassert': 'commonjs custom\nassert',
     },
-    module: {
-      rules: [
-        {
-          test: /\.ts$/,
-          oneOf: [
-            {
-              resource: (resource: string) =>
-                filter.testFile(resource, { watch, allowSkipping: true }),
-              use: [{ loader: 'builtin:swc-loader', options: transformed }],
-            },
-            { use: [{ loader: 'builtin:swc-loader', options: filtered ? plain : transformed }] },
-          ],
-        },
-      ],
-    },
-  } satisfies RspackConfiguration;
+    filtered,
+    shouldTransform: (resource) => filter.testFile(resource, { watch, allowSkipping: true }),
+  });
 }
 
 for (const { name: endpoint, createCompiler } of rspackHosts) {
@@ -83,15 +57,7 @@ for (const { name: endpoint, createCompiler } of rspackHosts) {
     async function build(filtered: boolean): Promise<Record<string, string>> {
       const config = configuration(directory, filtered, false);
       await runCompiler(createCompiler(config));
-      const names = (await readdir(path.join(directory, 'out'))).sort();
-      return Object.fromEntries(
-        await Promise.all(
-          names.map(
-            async (name) =>
-              [name, await readFile(path.join(directory, 'out', name), 'utf8')] as const,
-          ),
-        ),
-      );
+      return readBuildOutputs(path.join(directory, 'out'));
     }
     const baseline = await build(false);
     const filtered = await build(true);
@@ -109,62 +75,22 @@ for (const { name: endpoint, createCompiler } of rspackHosts) {
     await writeFile(filename, inputs.plain);
     const config = { ...configuration(directory, true, true), entry: './plain.ts' };
     const compiler = createCompiler(config);
-    let watching: ReturnType<typeof compiler.watch> | undefined;
-    try {
-      await new Promise<void>((resolve, reject) => {
-        let requestedUpdate = false;
-        let finished = false;
-        const timeout = setTimeout(() => finish(new Error('Watch rebuild timed out')), 20000);
-        function finish(error?: Error) {
-          if (finished) {
-            return;
-          }
-          finished = true;
-          clearTimeout(timeout);
-          if (error) {
-            reject(error);
-          } else {
-            resolve();
-          }
-        }
-        watching = compiler.watch({ poll: 50, aggregateTimeout: 10 }, (error, stats) => {
-          if (finished) {
-            return;
-          }
-          if (error || !stats || stats.hasErrors()) {
-            finish(
-              error || new Error(stats?.toString({ all: false, errors: true }) || 'Missing stats'),
-            );
-            return;
-          }
-          void (async () => {
-            const code = await readFile(path.join(directory, 'out/main.cjs'), 'utf8');
-            if (!requestedUpdate) {
-              requestedUpdate = true;
-              assert.equal(code.includes('diagnostic_marker'), false);
-              await writeFile(filename, inputs.alias);
-            } else {
-              const module = { exports: {} as Record<string, unknown> };
-              vm.runInNewContext(code, {
-                module,
-                exports: module.exports,
-                require: () => () => {},
-              });
-              if (module.exports.value !== 1) {
-                return;
-              }
-              assert.equal(code.includes('diagnostic_marker'), false);
-              assert.match(code, /invariant/);
-              finish();
-            }
-          })().catch(finish);
-        });
-      });
-    } finally {
-      if (watching) {
-        await new Promise<void>((resolve) => watching!.close(resolve));
+    let requestedUpdate = false;
+    await watchCompiler(compiler, async () => {
+      const code = await readFile(path.join(directory, 'out/main.cjs'), 'utf8');
+      if (!requestedUpdate) {
+        requestedUpdate = true;
+        assert.equal(code.includes('diagnostic_marker'), false);
+        await writeFile(filename, inputs.alias);
+        return false;
       }
-      await closeCompiler(compiler);
-    }
+      const value = executeCommonJS(code, { require: () => () => {} });
+      if (value.value !== 1) {
+        return false;
+      }
+      assert.equal(code.includes('diagnostic_marker'), false);
+      assert.match(code, /invariant/);
+      return true;
+    });
   });
 }
