@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { execCommitlint } from './lib/commitlint.mts';
-import { temporaryDirectory } from '@swc-plugins/test-utils/temp-dir';
+import { temporaryDirectory } from '@shakacode/swc-plugin-test-utils/temp-dir';
 
 for (const title of [
   'tooling: check PR titles',

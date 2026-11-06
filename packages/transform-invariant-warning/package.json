@@ -42,7 +42,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build:js": "tsc -p tsconfig.json"
   },
+  "dependencies": {
+    "@shakacode/swc-plugin-utils": "workspace:^"
+  },
   "devDependencies": {
-    "@swc-plugins/test-utils": "workspace:*"
+    "@shakacode/swc-plugin-test-utils": "workspace:*"
   }
 }

@@ -29,10 +29,10 @@ jobs:
       - run: pnpm format:check
       - name: Check generated TypeScript declarations
         run: cargo test --locked --workspace --lib exported_options_are_current
+      - name: Build Wasm artifacts and TypeScript packages
+        run: pnpm build
       - run: pnpm typecheck
       - run: pnpm lint
-      - name: Build the shared Wasm artifact
-        run: pnpm build
       - name: Check package exports and declarations
         run: pnpm check:packages
       - name: Rust, SWC, and earliest/latest Rspack tests

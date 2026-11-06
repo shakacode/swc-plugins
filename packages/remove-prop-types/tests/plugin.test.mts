@@ -1,9 +1,8 @@
+import { createPluginTestHarness } from '@shakacode/swc-plugin-test-utils/plugin';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
-import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
-import { transformSync } from '@swc/core';
 import type { PluginOptions } from 'swc-plugin-remove-prop-types';
 const plugin = fileURLToPath(new URL('../plugin.wasm', import.meta.url));
 function createTypes() {
@@ -15,17 +14,9 @@ function createTypes() {
     checkPropTypes: () => 'checked',
   };
 }
-export function compile(source: string, options: PluginOptions = {}) {
-  return transformSync(source, {
-    filename: 'fixture.tsx',
-    jsc: {
-      parser: { syntax: 'typescript', tsx: true },
-      target: 'es2022',
-      experimental: { plugins: [[plugin, options]] },
-    },
-    module: { type: 'commonjs' },
-  }).code;
-}
+const harness = createPluginTestHarness<PluginOptions>(plugin, 'fixture.tsx');
+export const compile = harness.compile;
+
 function evaluate(
   source: string,
   options: PluginOptions = {},
@@ -33,16 +24,13 @@ function evaluate(
 ) {
   const loads: string[] = [];
   const types = createTypes();
-  const module = { exports: {} };
-  vm.runInNewContext(compile(source, options), {
-    module,
-    exports: module.exports,
+  const value = harness.evaluate(source, options, {
     require: (name: string) => {
       loads.push(name);
       return Object.hasOwn(modules, name) ? modules[name] : types;
     },
   });
-  return { value: JSON.parse(JSON.stringify(module.exports)), loads };
+  return { value, loads };
 }
 
 test('the package runtime entry resolves to Wasm', () => {
@@ -126,6 +114,7 @@ test('keeps standalone validators and checkPropTypes', () => {
   );
 });
 
+// Keeping explicit side-effect imports is a conservative choice that can change later.
 test('preserves an explicit side-effect import', () => {
   assert.deepEqual(evaluate("import 'prop-types';"), { value: {}, loads: ['prop-types'] });
 });

@@ -96,7 +96,7 @@ and update dependent branches when an earlier layer changes.
 
 ## Releasing a plugin
 
-Plugins have independent versions. Each npm package and its matching Rust crate
+Public packages have independent versions. Each plugin npm package and its matching Rust crate
 share a version; other plugins are unaffected. The release flow follows
 [ShakaPerf's package-specific tags and publishing workflow](https://github.com/shakacode/shakaperf/blob/main/.github/workflows/publish.yml),
 with a changelog-driven `script/release` entry point like
@@ -110,6 +110,10 @@ merged changes, fill missing entries, suggest a version, and prepare a release
 PR. The scripts below perform the mechanical changes and also work without an
 agent. Ordinary PR changelog entries only need the changelog guidance above.
 Publishing is a separate post-merge action.
+
+The TypeScript-only `swc-plugin-utils` package uses the same release commands
+and scoped `@shakacode/swc-plugin-utils@<version>` tags, without a Rust crate or
+Wasm artifact. Publish it before plugin releases that depend on its new version.
 
 Invoke it as `$update-changelog` in Codex or `/update-changelog` in Claude Code.
 Other agents can read the linked `SKILL.md` directly. The canonical skill lives

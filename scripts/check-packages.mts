@@ -1,11 +1,11 @@
+import { createTemporaryDirectory } from '@shakacode/swc-plugin-test-utils/temp-dir';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const temporary = mkdtempSync(path.join(tmpdir(), 'swc-package-check-'));
+const { directory: temporary, cleanup } = createTemporaryDirectory('swc-package-check-');
 function run(args: string[], cwd = root) {
   execFileSync('pnpm', args, { cwd, stdio: 'inherit' });
 }
@@ -19,6 +19,7 @@ try {
     const manifest = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8')) as {
       name: string;
       version: string;
+      main?: string;
       exports: Record<string, unknown>;
     };
     run(['pack', '--pack-destination', temporary], directory);
@@ -27,8 +28,10 @@ try {
       `${manifest.name.replace(/^@/, '').replaceAll('/', '-')}-${manifest.version}.tgz`,
     );
     run(['exec', 'publint', archive, '--strict']);
-    // Plugin roots resolve to Wasm; analyze their JavaScript subpaths with ATTW.
-    const entrypoints = Object.keys(manifest.exports).filter((name) => name !== '.');
+    // Analyze JavaScript exports, including the root of utility packages.
+    const entrypoints = Object.keys(manifest.exports).filter(
+      (name) => name !== '.' || !manifest.main?.endsWith('.wasm'),
+    );
     if (entrypoints.length > 0) {
       run([
         'exec',
@@ -46,5 +49,5 @@ try {
     }
   }
 } finally {
-  rmSync(temporary, { recursive: true, force: true });
+  cleanup();
 }

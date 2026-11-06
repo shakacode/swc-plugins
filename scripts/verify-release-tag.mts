@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 export function verifyReleaseTag(root: string, tag: string, expectedCommit: string) {
-  if (!/^swc-plugin-[a-z0-9]+(?:-[a-z0-9]+)*@[^\s/@]+$/.test(tag)) {
+  if (
+    !/^(?:swc-plugin-[a-z0-9]+(?:-[a-z0-9]+)*|@shakacode\/swc-plugin-utils)@[^\s/@]+$/.test(tag)
+  ) {
     throw new Error('Select a package release tag');
   }
   if (!/^[0-9a-f]{40}$/.test(expectedCommit)) {

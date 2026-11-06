@@ -6,6 +6,8 @@ Rust SWC transform plugins developed by [ShakaCode](https://shakacode.com/) dist
 
 - [swc-plugin-remove-prop-types](packages/remove-prop-types/README.md) ([Changelog](packages/remove-prop-types/CHANGELOG.md))
 
+Shared host helpers: [@shakacode/swc-plugin-utils](packages/swc-plugin-utils/README.md).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and contribution guidelines.

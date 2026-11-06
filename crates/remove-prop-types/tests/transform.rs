@@ -83,6 +83,7 @@ fn keeps_runtime_metadata_and_exported_dictionaries() {
 
 #[test]
 fn unused_imports_are_pruned_but_runtime_and_side_effect_imports_remain() {
+    // Keeping explicit side-effect imports is a conservative choice that can change later.
     let code = rewrite("import PT, {checkPropTypes} from 'prop-types'; import 'prop-types'; function C() {} C.propTypes = {a: PT.string}; checkPropTypes(schema);", "{}").unwrap();
     assert!(!code.contains("PT"), "{code}");
     assert!(code.contains("checkPropTypes"), "{code}");

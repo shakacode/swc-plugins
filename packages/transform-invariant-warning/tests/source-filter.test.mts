@@ -4,7 +4,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import type { PluginOptions } from '../index.js';
 import { createSourceFilter } from 'swc-plugin-transform-invariant-warning/source-filter';
-import { temporaryDirectory } from '@swc-plugins/test-utils/temp-dir';
+import { temporaryDirectory } from '@shakacode/swc-plugin-test-utils/temp-dir';
 
 const context = { allowSkipping: true, watch: false };
 

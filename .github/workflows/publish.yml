@@ -64,9 +64,9 @@ jobs:
       - name: Resolve the newest supported Rspack release
         run: pnpm update:rspack
       - run: pnpm format:check
+      - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm lint
-      - run: pnpm build
       - name: Check package exports and declarations
         run: pnpm check:packages
       - run: pnpm test

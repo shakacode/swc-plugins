@@ -4,7 +4,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { transformSync } from '@swc/core';
-import { temporaryDirectory } from '@swc-plugins/test-utils/temp-dir';
+import { temporaryDirectory } from '@shakacode/swc-plugin-test-utils/temp-dir';
 import type { PluginOptions } from 'swc-plugin-remove-prop-types';
 import { createSourceFilter } from 'swc-plugin-remove-prop-types/source-filter';
 

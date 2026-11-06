@@ -9,9 +9,9 @@ import {
   runCompiler,
   closeCompiler,
   type RspackConfiguration,
-} from '@swc-plugins/test-utils/rspack';
+} from '@shakacode/swc-plugin-test-utils/rspack';
 import { createSourceFilter } from 'swc-plugin-remove-prop-types/source-filter';
-import { temporaryDirectory } from '@swc-plugins/test-utils/temp-dir';
+import { temporaryDirectory } from '@shakacode/swc-plugin-test-utils/temp-dir';
 
 const plugin = fileURLToPath(new URL('../plugin.wasm', import.meta.url));
 const inputs = {

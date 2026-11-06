@@ -1,7 +1,7 @@
+import { createPluginTestHarness, executeCommonJS } from '@shakacode/swc-plugin-test-utils/plugin';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
-import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { transformSync, type Options } from '@swc/core';
 
@@ -9,32 +9,19 @@ import type { PluginOptions } from 'swc-plugin-transform-invariant-warning';
 
 const plugin = fileURLToPath(new URL('../plugin.wasm', import.meta.url));
 
-export function compile(source: string, options: PluginOptions = {}) {
-  return transformSync(source, {
-    filename: 'fixture.ts',
-    jsc: {
-      parser: { syntax: 'typescript' },
-      target: 'es2022',
-      experimental: { plugins: [[plugin, options]] },
-    },
-    module: { type: 'commonjs' },
-  }).code;
-}
+const harness = createPluginTestHarness<PluginOptions>(plugin, 'fixture.ts');
+export const compile = harness.compile;
 
 function evaluate(source: string, options: PluginOptions = {}) {
   const calls: unknown[][] = [];
   const fn = (...args: unknown[]) => calls.push(args);
   const exported = { calls };
-  const context = {
+  return harness.evaluate<{ calls: unknown[][] }>(source, options, {
     exports: exported,
-    module: { exports: exported },
     require: () =>
       Object.assign(fn, { __esModule: true, default: fn, warning: fn, invariant: fn, other: fn }),
-    warning: fn,
-    invariant: fn,
-  };
-  vm.runInNewContext(compile(source, options), context);
-  return JSON.parse(JSON.stringify(context.module.exports)) as { calls: unknown[][] };
+    globals: { warning: fn, invariant: fn },
+  });
 }
 
 test('the package runtime entry still resolves to the Wasm artifact', () => {
@@ -258,7 +245,7 @@ test('removes optional and generic warning calls', () => {
 
 test('preserves optional invariant short-circuiting', () => {
   const code = compile("import invariant from 'invariant'; invariant?.(missing(), missing());");
-  vm.runInNewContext(code, { exports: {}, require: () => undefined });
+  executeCommonJS(code, { exports: {}, require: () => undefined });
 });
 
 test('preserves optional invariant arguments and their evaluation order when defined', () => {

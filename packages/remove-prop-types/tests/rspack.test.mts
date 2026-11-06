@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import vm from 'node:vm';
-import { TraceMap, originalPositionFor } from '@jridgewell/trace-mapping';
-import { rspackHosts, runCompiler, type RspackConfiguration } from '@swc-plugins/test-utils/rspack';
-import { temporaryDirectory } from '@swc-plugins/test-utils/temp-dir';
+import {
+  rspackHosts,
+  buildPluginFixture,
+  assertSourceMapping,
+} from '@shakacode/swc-plugin-test-utils/rspack';
+import { executeCommonJS } from '@shakacode/swc-plugin-test-utils/plugin';
 
 const plugin = fileURLToPath(new URL('../plugin.wasm', import.meta.url));
 const fixture = `
@@ -18,68 +18,21 @@ export const marker = new Error('retained_marker');
 
 for (const { name: endpoint, createCompiler } of rspackHosts) {
   test(`one Wasm artifact works on the ${endpoint} supported Rspack`, async (t) => {
-    const directory = temporaryDirectory(t, 'prop-types-rspack-');
-    await writeFile(path.join(directory, 'entry.ts'), fixture);
-    const config = {
-      context: directory,
-      mode: 'production',
-      target: 'node',
-      entry: './entry.ts',
-      devtool: 'source-map',
-      optimization: { minimize: false },
-      output: {
-        path: path.join(directory, 'dist'),
-        filename: 'bundle.cjs',
-        library: { type: 'commonjs2' },
-      },
+    const { code, map } = await buildPluginFixture(t, {
+      createCompiler,
+      plugin,
+      source: fixture,
       externals: { 'prop-types': 'commonjs prop-types' },
-      module: {
-        rules: [
-          {
-            test: /\.ts$/,
-            loader: 'builtin:swc-loader',
-            options: {
-              jsc: {
-                parser: { syntax: 'typescript' },
-                target: 'es2022',
-                experimental: { plugins: [[plugin, {}]] },
-              },
-            },
-          },
-        ],
-      },
-    } satisfies RspackConfiguration;
-    await runCompiler(createCompiler(config));
-    const code = await readFile(path.join(directory, 'dist/bundle.cjs'), 'utf8');
-    const module = { exports: {} as Record<string, unknown> };
-    vm.runInNewContext(code, {
-      module,
-      exports: module.exports,
+    });
+    const value = executeCommonJS(code, {
       require: () => {
         throw new Error('Unused validator dependency was loaded');
       },
     });
-    const component = module.exports.Component as (() => string) & { propTypes?: unknown };
+    const component = value.Component as (() => string) & { propTypes?: unknown };
     assert.equal(component(), 'retained');
     assert.equal(component.propTypes, undefined);
     assert.ok(!code.includes('prop-types'), 'validator dependency should leave the bundle');
-
-    const map = new TraceMap(
-      JSON.parse(await readFile(path.join(directory, 'dist/bundle.cjs.map'), 'utf8')),
-    );
-    const generatedOffset = code.indexOf('retained_marker');
-    assert.ok(generatedOffset >= 0);
-    const before = code.slice(0, generatedOffset).split('\n');
-    const original = originalPositionFor(map, {
-      line: before.length,
-      column: before.at(-1)!.length,
-    });
-    assert.equal(
-      original.line,
-      fixture.slice(0, fixture.indexOf('retained_marker')).split('\n').length,
-    );
-    assert.ok(original.source);
-    assert.ok(original.source.endsWith('entry.ts'), original.source);
-    assert.ok(map.sourcesContent?.includes(fixture));
+    assertSourceMapping(code, map, fixture, 'retained_marker');
   });
 }

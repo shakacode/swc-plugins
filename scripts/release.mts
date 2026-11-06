@@ -1,6 +1,6 @@
+import { createTemporaryDirectory } from '@shakacode/swc-plugin-test-utils/temp-dir';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -21,20 +21,21 @@ function readJson(file: string) {
   return JSON.parse(readFileSync(file, 'utf8'));
 }
 
-export function pluginPackage(root: string, directory: string) {
+export function publishablePackage(root: string, directory: string) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(directory)) {
-    throw new Error('Select a plugin directory under packages/');
+    throw new Error('Select a package directory under packages/');
   }
   const packageDirectory = path.join(root, 'packages', directory);
   const manifest = readJson(path.join(packageDirectory, 'package.json'));
   if (
     manifest.private ||
     typeof manifest.name !== 'string' ||
-    !/^swc-plugin-[a-z0-9-]+$/.test(manifest.name)
+    (!/^swc-plugin-[a-z0-9-]+$/.test(manifest.name) &&
+      manifest.name !== '@shakacode/swc-plugin-utils')
   ) {
-    throw new Error('Select a publishable SWC plugin package');
+    throw new Error('Select a publishable SWC plugin or utility package');
   }
-  return { packageDirectory, manifest };
+  return { packageDirectory, manifest, isPlugin: manifest.name.startsWith('swc-plugin-') };
 }
 
 function command(root: string, executable: string, args: string[]) {
@@ -70,13 +71,13 @@ export function changelogRelease(changelog: string) {
 }
 
 export function releasePlan(root: string, directory: string) {
-  const { packageDirectory, manifest } = pluginPackage(root, directory);
+  const { packageDirectory, manifest, isPlugin } = publishablePackage(root, directory);
   const cargoPath = path.join(root, 'crates', directory, 'Cargo.toml');
-  const cargo = readFileSync(cargoPath, 'utf8');
-  const packageSection = cargo.match(/^\[package\]\r?\n([\s\S]*?)(?=^\[|(?![\s\S]))/m)?.[1];
+  const cargo = isPlugin ? readFileSync(cargoPath, 'utf8') : null;
+  const packageSection = cargo?.match(/^\[package\]\r?\n([\s\S]*?)(?=^\[|(?![\s\S]))/m)?.[1];
   const cargoName = packageSection?.match(/^name = "([^"]+)"$/m)?.[1];
   const cargoVersion = packageSection?.match(/^version = "([^"]+)"$/m)?.[1];
-  if (cargoName !== manifest.name || !cargoVersion) {
+  if (isPlugin && (cargoName !== manifest.name || !cargoVersion)) {
     throw new Error('The matching Rust crate must have the same package name and its own version');
   }
   const release = changelogRelease(
@@ -89,6 +90,7 @@ export function releasePlan(root: string, directory: string) {
     directory,
     packageDirectory,
     manifest,
+    isPlugin,
     cargoPath,
     cargo,
     cargoVersion,
@@ -96,7 +98,10 @@ export function releasePlan(root: string, directory: string) {
 }
 
 function requirePrepared(plan: ReturnType<typeof releasePlan>) {
-  if (plan.manifest.version !== plan.version || plan.cargoVersion !== plan.version) {
+  if (
+    plan.manifest.version !== plan.version ||
+    (plan.isPlugin && plan.cargoVersion !== plan.version)
+  ) {
     throw new Error(
       'Package and crate versions must match the changelog; run script/release <plugin> --prepare in your release PR',
     );
@@ -105,7 +110,7 @@ function requirePrepared(plan: ReturnType<typeof releasePlan>) {
 
 export function prepareRelease(root: string, directory: string) {
   const plan = releasePlan(root, directory);
-  const cargo = plan.cargo.replace(
+  const cargo = plan.cargo?.replace(
     /^(\[package\]\r?\n[\s\S]*?^version = ")[^"]+("$)/m,
     (_match, prefix: string, suffix: string) => `${prefix}${plan.version}${suffix}`,
   );
@@ -113,11 +118,13 @@ export function prepareRelease(root: string, directory: string) {
     path.join(plan.packageDirectory, 'package.json'),
     `${JSON.stringify({ ...plan.manifest, version: plan.version }, null, 2)}\n`,
   );
-  writeFileSync(plan.cargoPath, cargo);
-  // Update workspace package versions without refreshing third-party dependencies.
-  command(root, 'cargo', ['update', '--workspace', '--offline']);
+  if (cargo !== undefined) {
+    writeFileSync(plan.cargoPath, cargo);
+    // Update workspace package versions without refreshing third-party dependencies.
+    command(root, 'cargo', ['update', '--workspace', '--offline']);
+  }
   console.log(
-    `Prepared ${plan.tag}. Commit the changelog, package.json, Cargo.toml, and Cargo.lock in a release PR.`,
+    `Prepared ${plan.tag}. Commit the changelog and package.json${plan.isPlugin ? ', Cargo.toml, and Cargo.lock' : ''} in a release PR.`,
   );
 }
 
@@ -177,13 +184,21 @@ export function publishRelease(root: string, tag: string) {
     throw new Error('Tag, checked-out commit, and changelog version must agree');
   }
   command(root, 'git', ['merge-base', '--is-ancestor', 'HEAD', 'origin/main']);
-  // A missing Wasm file would otherwise be silently omitted from the npm tarball.
-  const wasm = readFileSync(path.join(plan.packageDirectory, 'plugin.wasm'));
-  if (!wasm.subarray(0, 8).equals(Buffer.from([0, 97, 115, 109, 1, 0, 0, 0]))) {
-    throw new Error('Build the plugin before publishing');
+  if (plan.isPlugin) {
+    // A missing Wasm file would otherwise be silently omitted from the npm tarball.
+    const wasm = readFileSync(path.join(plan.packageDirectory, 'plugin.wasm'));
+    if (!wasm.subarray(0, 8).equals(Buffer.from([0, 97, 115, 109, 1, 0, 0, 0]))) {
+      throw new Error('Build the plugin before publishing');
+    }
+  } else {
+    for (const entry of ['dist/index.mjs', 'dist/index.d.mts']) {
+      if (!readFileSync(path.join(plan.packageDirectory, entry)).length) {
+        throw new Error('Build the utility package before publishing');
+      }
+    }
   }
   requireChannelAdvance(root, plan);
-  const temporary = mkdtempSync(path.join(tmpdir(), 'swc-release-'));
+  const { directory: temporary, cleanup } = createTemporaryDirectory('swc-release-');
   try {
     command(plan.packageDirectory, 'pnpm', ['pack', '--pack-destination', temporary]);
     const tarballs = readdirSync(temporary).filter((file) => file.endsWith('.tgz'));
@@ -219,7 +234,7 @@ export function publishRelease(root: string, tag: string) {
       ...(plan.distTag === 'next' ? ['--prerelease'] : []),
     ]);
   } finally {
-    rmSync(temporary, { recursive: true, force: true });
+    cleanup();
   }
 }
 
@@ -234,7 +249,7 @@ export function main(root: string, args: string[]) {
       help: { type: 'boolean', short: 'h' },
     },
   });
-  const usage = 'Usage: script/release <plugin-directory> [--prepare | --dry-run]';
+  const usage = 'Usage: script/release <package-directory> [--prepare | --dry-run]';
   if (values.help) {
     console.log(
       `${usage}\nPrepare versions in a release PR, then run without flags from synchronized main to publish via GitHub Actions.`,

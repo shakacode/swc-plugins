@@ -1,16 +1,20 @@
 {
-  "name": "@swc-plugins/test-utils",
+  "name": "@shakacode/swc-plugin-test-utils",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": {
     "./rspack": "./src/rspack.mts",
-    "./temp-dir": "./src/temp-dir.mts"
+    "./temp-dir": "./src/temp-dir.mts",
+    "./plugin": "./src/plugin.mts",
+    "./package": "./src/package.mts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@jridgewell/trace-mapping": "0.3.31",
+    "@swc/core": "1.16.21",
     "rspack-earliest": "npm:@rspack/core@2.2.0",
     "rspack-latest": "npm:@rspack/core@^2.2.0"
   }
