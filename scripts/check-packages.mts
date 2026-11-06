@@ -20,7 +20,15 @@ try {
     const { manifest, archive } = packPackage(directory, temporary);
     run(['exec', 'publint', archive, '--strict']);
     // Analyze JavaScript exports, including the root of utility packages.
-    const entrypoints = Object.keys(manifest.exports).filter(
+    const packageExports = manifest.exports;
+    const exportNames =
+      packageExports &&
+      typeof packageExports === 'object' &&
+      !Array.isArray(packageExports) &&
+      Object.keys(packageExports).some((name) => name.startsWith('.'))
+        ? Object.keys(packageExports)
+        : ['.'];
+    const entrypoints = exportNames.filter(
       (name) => name !== '.' || !manifest.main?.endsWith('.wasm'),
     );
     if (entrypoints.length > 0) {

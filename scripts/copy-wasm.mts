@@ -1,5 +1,6 @@
+import { readPackageJson } from '@shakacode/swc-plugin-test-utils/package';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, readFileSync } from 'node:fs';
+import { copyFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -33,7 +34,7 @@ for (const crate of metadata.packages) {
   }
   const directory = path.basename(path.dirname(crate.manifest_path));
   const packageDirectory = path.join(root, 'packages', directory);
-  const manifest = JSON.parse(readFileSync(path.join(packageDirectory, 'package.json'), 'utf8'));
+  const manifest = readPackageJson(packageDirectory);
   if (manifest.name !== crate.name || manifest.version !== crate.version) {
     throw new Error(`Package and crate names and versions must match for ${directory}`);
   }

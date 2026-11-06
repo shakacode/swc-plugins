@@ -1,3 +1,4 @@
+import { readPackageJson } from '@shakacode/swc-plugin-test-utils/package';
 import { createTemporaryDirectory } from '@shakacode/swc-plugin-test-utils/temp-dir';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -17,16 +18,12 @@ export function parseReleaseVersion(version: unknown) {
   return parsed;
 }
 
-function readJson(file: string) {
-  return JSON.parse(readFileSync(file, 'utf8'));
-}
-
 export function publishablePackage(root: string, directory: string) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(directory)) {
     throw new Error('Select a package directory under packages/');
   }
   const packageDirectory = path.join(root, 'packages', directory);
-  const manifest = readJson(path.join(packageDirectory, 'package.json'));
+  const manifest = readPackageJson(packageDirectory);
   if (
     manifest.private ||
     typeof manifest.name !== 'string' ||
@@ -169,7 +166,7 @@ export function publishRelease(root: string, tag: string) {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);
   const directory = directories.find((entry) =>
-    tag.startsWith(`${readJson(path.join(root, 'packages', entry, 'package.json')).name}@`),
+    tag.startsWith(`${readPackageJson(path.join(root, 'packages', entry)).name}@`),
   );
   if (!directory) {
     throw new Error('Release tag does not identify a workspace package');

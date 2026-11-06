@@ -44,6 +44,9 @@ importers:
       semver:
         specifier: 7.8.6
         version: 7.8.6
+      type-fest:
+        specifier: 5.10.0
+        version: 5.10.0
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -62,6 +65,10 @@ importers:
       rspack-latest:
         specifier: npm:@rspack/core@^2.2.0
         version: /@rspack/core@2.3.0
+    devDependencies:
+      type-fest:
+        specifier: 5.10.0
+        version: 5.10.0
 
   packages/remove-prop-types:
     dependencies:
@@ -2015,6 +2022,11 @@ packages:
       supports-color: 7.2.0
     dev: true
 
+  /tagged-tag@1.0.0:
+    resolution: {integrity: sha512-yEFYrVhod+hdNyx7g5Bnkkb0G6si8HJurOoOEgC8B/O0uXLHlaey/65KRv6cuWBNhBgHKAROVpc7QyYqE5gFng==}
+    engines: {node: '>=20'}
+    dev: true
+
   /thenify-all@1.6.0:
     resolution: {integrity: sha512-RNxQH/qI8/t3thXJDwcstUO4zeqo64+Uy/+sNVRBx4Xn2OX+OZ9oP+iJnNFqplFra2ZUVeKCSa2oVWi3T4uVmA==}
     engines: {node: '>=0.8'}
@@ -2043,6 +2055,13 @@ packages:
     requiresBuild: true
     dev: false
     optional: true
+
+  /type-fest@5.10.0:
+    resolution: {integrity: sha512-NoSdpq/WEiAg5sjmBkmV/hfxv6HJH4NqPNrqjtSO5CwRmpsDfaf4begxW34KdJykH/l1yHtwBWQkCRdoXO8mPA==}
+    engines: {node: '>=20'}
+    dependencies:
+      tagged-tag: 1.0.0
+    dev: true
 
   /typescript@5.6.1-rc:
     resolution: {integrity: sha512-E3b2+1zEFu84jB0YQi9BORDjz9+jGbwwy1Zi3G0LUNw7a7cePUrHMRNy8aPh53nXpkFGVHSxIZo5vKTfYaFiBQ==}

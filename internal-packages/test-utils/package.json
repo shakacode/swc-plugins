@@ -17,5 +17,8 @@
     "@swc/core": "1.16.21",
     "rspack-earliest": "npm:@rspack/core@2.2.0",
     "rspack-latest": "npm:@rspack/core@^2.2.0"
+  },
+  "devDependencies": {
+    "type-fest": "5.10.0"
   }
 }

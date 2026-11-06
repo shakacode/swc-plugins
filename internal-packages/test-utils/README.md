@@ -10,7 +10,7 @@ Node runs the TypeScript sources directly; no build is needed for this workspace
 - `@shakacode/swc-plugin-test-utils/plugin` provides `createPluginTestHarness`
   for SWC compilation and JSON-result evaluation, plus `executeCommonJS` for raw exports.
 - `@shakacode/swc-plugin-test-utils/package` provides `installPackedPackage`
-  for installing real pnpm tarballs into isolated consumers, plus `packPackage`,
+  for installing real pnpm tarballs into isolated consumers, plus typed `readPackageJson`, `packPackage`,
   `runConsumer`, and `typecheckConsumer` for package checks.
 - `@shakacode/swc-plugin-test-utils/temp-dir` provides `temporaryDirectory(t, prefix)`
   with test-managed cleanup, and `createTemporaryDirectory(prefix)` with explicit cleanup
