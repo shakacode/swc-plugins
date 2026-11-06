@@ -33,11 +33,12 @@ export function normalizeSourceOptions<Key extends string>(
   const record = parsed as Record<string, unknown>;
   return Object.fromEntries(
     Object.entries(defaults).map(([key, fallback]) => {
-      const value = Object.hasOwn(record, key) ? record[key] : fallback;
+      const supplied = Object.hasOwn(record, key);
+      const value = supplied ? record[key] : fallback;
       if (!Array.isArray(value) || !value.every((entry) => typeof entry === 'string')) {
         throw new TypeError(`${key} must be an array of strings`);
       }
-      return [key, value as readonly string[]];
+      return [key, (supplied ? value : [...value]) as readonly string[]];
     }),
   ) as Record<Key, readonly string[]>;
 }

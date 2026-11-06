@@ -60,3 +60,13 @@ test('file filtering requires explicit permission and reads fresh input', () => 
     true,
   );
 });
+
+test('default lists cannot change guest options after names are captured', () => {
+  const defaults = { sources: ['old/helper'] };
+  const options = normalizeSourceOptions({}, defaults);
+  const filter = createSourceFilter(options, options.sources);
+  defaults.sources.push('new/helper');
+  assert.deepEqual(filter.options, { sources: ['old/helper'] });
+  assert.equal(filter.test("import x from 'old/helper'"), true);
+  assert.equal(filter.test("import x from 'new/helper'"), false);
+});
