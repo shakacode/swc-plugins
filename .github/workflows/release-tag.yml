@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'swc-plugin-*@*'
+      - '@shakacode/swc-plugin-utils@*'
 
 permissions: {}
 

@@ -1,0 +1,2 @@
+// Generated from Rust by ts-rs. Run pnpm types:generate to update.
+export type PluginOptions = { additionalLibraries?: ReadonlyArray<string> };

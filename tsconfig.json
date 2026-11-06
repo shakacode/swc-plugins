@@ -12,7 +12,11 @@
     "paths": {
       "swc-plugin-transform-invariant-warning/source-filter": [
         "./packages/transform-invariant-warning/src/source-filter.mts"
-      ]
+      ],
+      "swc-plugin-remove-prop-types/source-filter": [
+        "./packages/remove-prop-types/src/source-filter.mts"
+      ],
+      "@shakacode/swc-plugin-utils": ["./packages/swc-plugin-utils/src/index.mts"]
     }
   },
   "include": ["scripts/**/*.mts", "commitlint.config.mts", "packages/*/tests/**/*.mts"]

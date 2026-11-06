@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { gt, lt } from 'semver';
-import { changelogRelease, parseReleaseVersion, pluginPackage } from './release.mts';
+import { changelogRelease, parseReleaseVersion, publishablePackage } from './release.mts';
 
 export function stampChangelog(changelog: string, version: string, date: string) {
   parseReleaseVersion(version);
@@ -44,7 +44,7 @@ export function updatePackageChangelog(
   date: string,
   dryRun = false,
 ) {
-  const { packageDirectory, manifest } = pluginPackage(root, directory);
+  const { packageDirectory, manifest } = publishablePackage(root, directory);
   const file = path.join(packageDirectory, 'CHANGELOG.md');
   const source = readFileSync(file, 'utf8');
   const current = parseReleaseVersion(manifest.version);

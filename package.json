@@ -8,22 +8,22 @@
     "lint": "oxlint -c .oxlintrc.jsonc --deny-warnings . && cargo clippy --locked --workspace --all-targets -- -D warnings",
     "format": "oxfmt -c .oxfmtrc.jsonc . && cargo fmt --all",
     "format:check": "oxfmt -c .oxfmtrc.jsonc --check . && cargo fmt --all --check",
-    "types:generate": "UPDATE_BINDINGS=1 cargo test --locked --lib exported_options_are_current",
+    "types:generate": "UPDATE_BINDINGS=1 cargo test --locked --workspace --lib exported_options_are_current",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck",
     "check:packages": "node scripts/check-packages.mts",
     "commitlint": "commitlint",
     "commitlint:ci": "node scripts/commitlint-ci.mts",
     "test:commitlint": "node --test --test-isolation=none scripts/commitlint.test.mts",
     "setup": "pnpm install --frozen-lockfile && pnpm build",
-    "validate": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm build && pnpm check:packages && pnpm test",
+    "validate": "pnpm format:check && pnpm build && pnpm typecheck && pnpm lint && pnpm check:packages && pnpm test",
     "test:release": "node --test --test-isolation=none scripts/release.test.mts",
-    "update:rspack": "pnpm --filter @swc-plugins/test-utils update rspack-latest"
+    "update:rspack": "pnpm --filter @shakacode/swc-plugin-test-utils update rspack-latest"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@commitlint/cli": "21.2.4",
     "@jridgewell/trace-mapping": "0.3.31",
-    "@swc-plugins/test-utils": "workspace:*",
+    "@shakacode/swc-plugin-test-utils": "workspace:*",
     "@swc/core": "1.16.21",
     "@types/node": "24.19.2",
     "@types/semver": "7.8.0",
@@ -32,6 +32,7 @@
     "oxlint-tsgolint": "7.0.2005",
     "publint": "0.3.25",
     "semver": "7.8.6",
+    "type-fest": "5.10.0",
     "typescript": "7.0.2"
   },
   "engines": {

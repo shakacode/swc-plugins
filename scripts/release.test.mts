@@ -7,7 +7,7 @@ import { test, type TestContext } from 'node:test';
 import { changelogRelease, main, prepareRelease, publishRelease, releasePlan } from './release.mts';
 import { stampChangelog, updatePackageChangelog } from './update-changelog.mts';
 import { verifyReleaseTag } from './verify-release-tag.mts';
-import { temporaryDirectory } from '@swc-plugins/test-utils/temp-dir';
+import { temporaryDirectory } from '@shakacode/swc-plugin-test-utils/temp-dir';
 
 const changelog = (version = '0.2.0', notes = '### Added\n\n- A useful change.') =>
   `# Changelog\n\n## Unreleased\n\n## ${version} - 2026-11-03\n\n${notes}\n\n## 0.1.0 - 2026-10-01\n\n- Older change.\n`;
@@ -262,6 +262,25 @@ test('preparing a release updates only the selected package and crate, including
   assert.throws(() => releasePlan(root, '../alpha'), /directory/);
 });
 
+test('prepares and dry-runs scoped utility releases without a Rust crate', (t) => {
+  const { root } = fixture(t);
+  const directory = path.join(root, 'packages/swc-plugin-utils');
+  mkdirSync(directory);
+  writeFileSync(
+    path.join(directory, 'package.json'),
+    JSON.stringify({ name: '@shakacode/swc-plugin-utils', version: '0.1.0' }),
+  );
+  writeFileSync(path.join(directory, 'CHANGELOG.md'), changelog());
+  const before = readFileSync(path.join(root, 'crates/alpha/Cargo.toml'), 'utf8');
+  prepareRelease(root, 'swc-plugin-utils');
+  const plan = releasePlan(root, 'swc-plugin-utils');
+  assert.equal(plan.manifest.version, '0.2.0');
+  assert.equal(plan.cargo, null);
+  assert.equal(plan.tag, '@shakacode/swc-plugin-utils@0.2.0');
+  assert.equal(readFileSync(path.join(root, 'crates/alpha/Cargo.toml'), 'utf8'), before);
+  main(root, ['swc-plugin-utils', '--dry-run']);
+});
+
 test('dry runs do not change files or create tags; live release pushes only a package tag', (t) => {
   const { root, git, commit, remote } = fixture(t);
   assert.throws(() => main(root, ['alpha', '--dry-run']), /--prepare/);
@@ -313,6 +332,13 @@ test('release-tag verification accepts merged commits and rejects unmerged or ch
     commit: head,
     package: 'swc-plugin-alpha',
   });
+  git('tag', '@shakacode/swc-plugin-utils@0.2.0');
+  assert.deepEqual(verifyReleaseTag(root, '@shakacode/swc-plugin-utils@0.2.0', head), {
+    tag: '@shakacode/swc-plugin-utils@0.2.0',
+    commit: head,
+    package: '@shakacode/swc-plugin-utils',
+  });
+  assert.throws(() => verifyReleaseTag(root, '@other/package@0.2.0', head), /release tag/);
   assert.throws(
     () => verifyReleaseTag(root, 'swc-plugin-alpha@0.2.0', '0'.repeat(40)),
     /triggering commit/,
@@ -390,22 +416,43 @@ const publicationCases: {
   },
 ];
 
-for (const scenario of publicationCases) {
+for (const scenario of [
+  ...publicationCases,
+  { label: 'scoped utility without Wasm', version: '0.2.0', distTags: '{}' },
+]) {
   const { version } = scenario;
   test(`publishing handles ${scenario.label}`, (t) => {
     const { root, git, commit, remote } = fixture(t);
-    writeFileSync(path.join(root, 'packages/alpha/CHANGELOG.md'), changelog(version));
-    prepareRelease(root, 'alpha');
+    const utility = scenario.label === 'scoped utility without Wasm';
+    const directory = utility ? 'swc-plugin-utils' : 'alpha';
+    const packageName = utility ? '@shakacode/swc-plugin-utils' : 'swc-plugin-alpha';
+    const packageDirectory = path.join(root, 'packages', directory);
+    if (utility) {
+      mkdirSync(path.join(packageDirectory, 'dist'), { recursive: true });
+      writeFileSync(
+        path.join(packageDirectory, 'package.json'),
+        JSON.stringify({ name: packageName, version: '0.1.0', type: 'module', files: ['dist'] }),
+      );
+      writeFileSync(path.join(packageDirectory, 'dist/index.mjs'), 'export const value = 42;');
+      writeFileSync(
+        path.join(packageDirectory, 'dist/index.d.mts'),
+        'export declare const value = 42;',
+      );
+    }
+    writeFileSync(path.join(packageDirectory, 'CHANGELOG.md'), changelog(version));
+    prepareRelease(root, directory);
     git('init', '-q', '-b', 'main');
     commit();
     git('init', '--bare', '-q', remote);
     git('remote', 'add', 'origin', remote);
     git('push', '-u', 'origin', 'main');
-    git('tag', `swc-plugin-alpha@${version}`);
-    writeFileSync(
-      path.join(root, 'packages/alpha/plugin.wasm'),
-      Buffer.from([0, 97, 115, 109, 1, 0, 0, 0]),
-    );
+    git('tag', `${packageName}@${version}`);
+    if (!utility) {
+      writeFileSync(
+        path.join(packageDirectory, 'plugin.wasm'),
+        Buffer.from([0, 97, 115, 109, 1, 0, 0, 0]),
+      );
+    }
     const bin = path.join(root, 'fake-bin');
     const log = path.join(root, 'publish.jsonl');
     mkdirSync(bin);
@@ -448,7 +495,7 @@ appendFileSync(process.env.RELEASE_TEST_LOG, JSON.stringify(result) + '\\n');
         'release-test',
         fileURLToPath(new URL('./release.mts', import.meta.url)),
         root,
-        `swc-plugin-alpha@${version}`,
+        `${packageName}@${version}`,
       ],
       {
         cwd: root,
@@ -468,7 +515,7 @@ appendFileSync(process.env.RELEASE_TEST_LOG, JSON.stringify(result) + '\\n');
       .map((line) => JSON.parse(line));
     assert.equal(execution.status, scenario.error ? 1 : 0, execution.stderr);
     assert.equal(calls[0].tool, 'npm');
-    assert.deepEqual(calls[0].args, ['view', 'swc-plugin-alpha', 'dist-tags', '--json']);
+    assert.deepEqual(calls[0].args, ['view', packageName, 'dist-tags', '--json']);
     if (scenario.error) {
       assert.match(execution.stderr, scenario.error);
       assert.equal(calls.length, 1, 'registry failures must stop before publication');
@@ -477,9 +524,15 @@ appendFileSync(process.env.RELEASE_TEST_LOG, JSON.stringify(result) + '\\n');
     assert.equal(calls.length, 3);
     const [, npm, gh] = calls;
     assert.equal(npm.tool, 'npm');
-    assert.equal(npm.manifest.name, 'swc-plugin-alpha');
+    assert.equal(npm.manifest.name, packageName);
     assert.equal(npm.manifest.version, version);
-    assert.match(npm.files, /package\/plugin.wasm/);
+    if (utility) {
+      assert.match(npm.files, /package\/dist\/index.mjs/);
+      assert.match(npm.files, /package\/dist\/index.d.mts/);
+      assert.doesNotMatch(npm.files, /plugin.wasm/);
+    } else {
+      assert.match(npm.files, /package\/plugin.wasm/);
+    }
     assert.doesNotMatch(npm.files, /beta/);
     assert.deepEqual(npm.args.slice(2), [
       '--access',
@@ -487,7 +540,7 @@ appendFileSync(process.env.RELEASE_TEST_LOG, JSON.stringify(result) + '\\n');
       ...(version.includes('-') ? ['--tag', 'next'] : []),
     ]);
     assert.equal(gh.tool, 'gh');
-    assert.equal(gh.args[2], `swc-plugin-alpha@${version}`);
+    assert.equal(gh.args[2], `${packageName}@${version}`);
     assert.equal(gh.args.includes('--prerelease'), version.includes('-'));
     assert.equal(gh.notes, '### Added\n\n- A useful change.\n');
   });

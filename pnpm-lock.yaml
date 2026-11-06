@@ -17,7 +17,7 @@ importers:
       '@jridgewell/trace-mapping':
         specifier: 0.3.31
         version: 0.3.31
-      '@swc-plugins/test-utils':
+      '@shakacode/swc-plugin-test-utils':
         specifier: workspace:*
         version: link:internal-packages/test-utils
       '@swc/core':
@@ -44,22 +44,55 @@ importers:
       semver:
         specifier: 7.8.6
         version: 7.8.6
+      type-fest:
+        specifier: 5.10.0
+        version: 5.10.0
       typescript:
         specifier: 7.0.2
         version: 7.0.2
 
   internal-packages/test-utils:
     dependencies:
+      '@jridgewell/trace-mapping':
+        specifier: 0.3.31
+        version: 0.3.31
+      '@swc/core':
+        specifier: 1.16.21
+        version: 1.16.21
       rspack-earliest:
         specifier: npm:@rspack/core@2.2.0
         version: /@rspack/core@2.2.0
       rspack-latest:
         specifier: npm:@rspack/core@^2.2.0
         version: /@rspack/core@2.3.0
+    devDependencies:
+      type-fest:
+        specifier: 5.10.0
+        version: 5.10.0
+
+  packages/remove-prop-types:
+    dependencies:
+      '@shakacode/swc-plugin-utils':
+        specifier: workspace:^
+        version: link:../swc-plugin-utils
+    devDependencies:
+      '@shakacode/swc-plugin-test-utils':
+        specifier: workspace:*
+        version: link:../../internal-packages/test-utils
+
+  packages/swc-plugin-utils:
+    devDependencies:
+      '@shakacode/swc-plugin-test-utils':
+        specifier: workspace:*
+        version: link:../../internal-packages/test-utils
 
   packages/transform-invariant-warning:
+    dependencies:
+      '@shakacode/swc-plugin-utils':
+        specifier: workspace:^
+        version: link:../swc-plugin-utils
     devDependencies:
-      '@swc-plugins/test-utils':
+      '@shakacode/swc-plugin-test-utils':
         specifier: workspace:*
         version: link:../../internal-packages/test-utils
 
@@ -331,18 +364,15 @@ packages:
   /@jridgewell/resolve-uri@3.1.2:
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
     engines: {node: '>=6.0.0'}
-    dev: true
 
   /@jridgewell/sourcemap-codec@1.6.0:
     resolution: {integrity: sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw==}
-    dev: true
 
   /@jridgewell/trace-mapping@0.3.31:
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
-    dev: true
 
   /@loaderkit/resolve@1.0.6:
     resolution: {integrity: sha512-G8FdIoF5CypfwmD9rl8BXod5HDn8JqB0CCNBXDTaRZ+yRYhARrrSToX1zg1zy9jX3zLqigsELwhT4gNtkdQAUg==}
@@ -1081,7 +1111,6 @@ packages:
     cpu: [arm64]
     os: [darwin]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@swc/core-darwin-x64@1.16.21:
@@ -1090,7 +1119,6 @@ packages:
     cpu: [x64]
     os: [darwin]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@swc/core-linux-arm-gnueabihf@1.16.21:
@@ -1099,7 +1127,6 @@ packages:
     cpu: [arm]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@swc/core-linux-arm64-gnu@1.16.21:
@@ -1108,7 +1135,6 @@ packages:
     cpu: [arm64]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@swc/core-linux-arm64-musl@1.16.21:
@@ -1117,7 +1143,6 @@ packages:
     cpu: [arm64]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@swc/core-linux-ppc64-gnu@1.16.21:
@@ -1126,7 +1151,6 @@ packages:
     cpu: [ppc64]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@swc/core-linux-s390x-gnu@1.16.21:
@@ -1135,7 +1159,6 @@ packages:
     cpu: [s390x]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@swc/core-linux-x64-gnu@1.16.21:
@@ -1144,7 +1167,6 @@ packages:
     cpu: [x64]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@swc/core-linux-x64-musl@1.16.21:
@@ -1153,7 +1175,6 @@ packages:
     cpu: [x64]
     os: [linux]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@swc/core-win32-arm64-msvc@1.16.21:
@@ -1162,7 +1183,6 @@ packages:
     cpu: [arm64]
     os: [win32]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@swc/core-win32-ia32-msvc@1.16.21:
@@ -1171,7 +1191,6 @@ packages:
     cpu: [ia32]
     os: [win32]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@swc/core-win32-x64-msvc@1.16.21:
@@ -1180,7 +1199,6 @@ packages:
     cpu: [x64]
     os: [win32]
     requiresBuild: true
-    dev: true
     optional: true
 
   /@swc/core@1.16.21:
@@ -1208,17 +1226,14 @@ packages:
       '@swc/core-win32-arm64-msvc': 1.16.21
       '@swc/core-win32-ia32-msvc': 1.16.21
       '@swc/core-win32-x64-msvc': 1.16.21
-    dev: true
 
   /@swc/counter@0.1.3:
     resolution: {integrity: sha512-e2BR4lsJkkRlKZ/qCHPw9ZaSxc0MVUd7gtbtaB7aMvHeJVYe8sOB8DBZkP2DtISHGSku9sCK6T6cnY0CtXrOCQ==}
-    dev: true
 
   /@swc/types@0.1.28:
     resolution: {integrity: sha512-V6Mnml8v09QALx6K0elJ7o9K/MkVDtW3t6L+7Ou/JcWtb3xwId2AH4FeOceySd2JaO87IMw4+6vSZxLm34LPbw==}
     dependencies:
       '@swc/counter': 0.1.3
-    dev: true
 
   /@tybys/wasm-util@0.10.4:
     resolution: {integrity: sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A==}
@@ -2007,6 +2022,11 @@ packages:
       supports-color: 7.2.0
     dev: true
 
+  /tagged-tag@1.0.0:
+    resolution: {integrity: sha512-yEFYrVhod+hdNyx7g5Bnkkb0G6si8HJurOoOEgC8B/O0uXLHlaey/65KRv6cuWBNhBgHKAROVpc7QyYqE5gFng==}
+    engines: {node: '>=20'}
+    dev: true
+
   /thenify-all@1.6.0:
     resolution: {integrity: sha512-RNxQH/qI8/t3thXJDwcstUO4zeqo64+Uy/+sNVRBx4Xn2OX+OZ9oP+iJnNFqplFra2ZUVeKCSa2oVWi3T4uVmA==}
     engines: {node: '>=0.8'}
@@ -2035,6 +2055,13 @@ packages:
     requiresBuild: true
     dev: false
     optional: true
+
+  /type-fest@5.10.0:
+    resolution: {integrity: sha512-NoSdpq/WEiAg5sjmBkmV/hfxv6HJH4NqPNrqjtSO5CwRmpsDfaf4begxW34KdJykH/l1yHtwBWQkCRdoXO8mPA==}
+    engines: {node: '>=20'}
+    dependencies:
+      tagged-tag: 1.0.0
+    dev: true
 
   /typescript@5.6.1-rc:
     resolution: {integrity: sha512-E3b2+1zEFu84jB0YQi9BORDjz9+jGbwwy1Zi3G0LUNw7a7cePUrHMRNy8aPh53nXpkFGVHSxIZo5vKTfYaFiBQ==}
