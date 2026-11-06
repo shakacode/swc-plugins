@@ -189,6 +189,12 @@ impl Visit for RuntimeMetadata {
         export.visit_children_with(self);
     }
     fn visit_call_expr(&mut self, call: &CallExpr) {
+        // A local binding named eval can also contain the intrinsic, so binding
+        // identity alone cannot rule out access to this module's lexical scope.
+        if matches!(&call.callee, Callee::Expr(callee) if matches!(unwrapped(callee), Expr::Ident(id) if id.sym == "eval"))
+        {
+            self.found = true;
+        }
         if define_target(call, self.unresolved)
             .is_some_and(|target| exports_target(target, self.unresolved))
         {

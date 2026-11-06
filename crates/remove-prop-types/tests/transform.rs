@@ -161,3 +161,18 @@ fn modified_interop_helpers_keep_initializer_effects() {
     let code = rewrite("import { _ as interop } from '@swc/helpers/_/_interop_require_default'; interop._ = record; const PT = interop._(require('prop-types'));", "{}").unwrap();
     assert!(code.contains("interop._(require('prop-types'))"), "{code}");
 }
+
+#[test]
+fn direct_eval_keeps_lexical_bindings_and_metadata() {
+    for source in [
+        "const PT = require('prop-types'); exports.value = eval('PT.string');",
+        "const C = {}; C.propTypes = {}; exports.value = (eval)('C.propTypes');",
+        "function run(eval) { const PT = require('prop-types'); return eval('PT.string'); }",
+    ] {
+        let code = rewrite(source, "{}").unwrap();
+        assert!(
+            code.contains("prop-types") || code.contains("C.propTypes ="),
+            "{code}"
+        );
+    }
+}

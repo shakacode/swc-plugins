@@ -599,3 +599,25 @@ for (const expression of ['() => {}', 'function() {}', 'class { static label = t
     });
   }
 }
+
+for (const source of [
+  "const PT = require('prop-types'); exports.value = eval('PT.string.isRequired');",
+  "const PT = require('prop-types'); const validate = PT.string; exports.value = (eval)('validate.isRequired');",
+  "function run() { const PT = require('prop-types'); return eval('PT.string.isRequired'); } exports.value = run();",
+]) {
+  test(`direct eval retains lexical validator bindings: ${source}`, () => {
+    assert.deepEqual(evaluate(source), { value: { value: 'required' }, loads: ['prop-types'] });
+  });
+}
+
+test('direct eval retains definitions it can inspect dynamically', () => {
+  assert.deepEqual(
+    evaluate(
+      "const C = {}; C.propTypes = { field: 42 }; exports.value = eval('C.propTypes.field');",
+    ),
+    {
+      value: { value: 42 },
+      loads: [],
+    },
+  );
+});

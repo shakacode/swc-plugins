@@ -188,6 +188,8 @@ Some code enumerates or forwards properties using validator dictionaries. The
 plugin preserves the whole module when it detects a runtime `propTypes` member
 read or a named `propTypes` export, including CommonJS exports and export aliases.
 Conservative analysis also preserves modules that may modify global `Object` or `require`.
+Modules with potentially direct `eval(...)` calls remain unchanged because dynamic
+code can access their local bindings or metadata.
 
 The plugin cannot detect another module reading an exported component's
 `propTypes`, arbitrary reflection, or indirect runtime data flow. Exclude modules
